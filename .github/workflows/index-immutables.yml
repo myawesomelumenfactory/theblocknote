@@ -2,8 +2,8 @@ name: Publish immutables.json
 
 on:
   schedule:
-    # Bitcoin is ~1 block / 10 min; 30 min keeps the public file near tip
-    # after the index has caught up, and still walks forward during backfill.
+    # Keep publishing forever: Bitcoin has no final block. After catch-up,
+    # each run is only the last 8 indexed blocks plus new blocks to tip.
     - cron: '*/30 * * * *'
   workflow_dispatch:
 
@@ -35,7 +35,8 @@ jobs:
         env:
           BLOCKSTREAM_CLIENT_ID: ${{ secrets.BLOCKSTREAM_CLIENT_ID }}
           BLOCKSTREAM_CLIENT_SECRET: ${{ secrets.BLOCKSTREAM_CLIENT_SECRET }}
-        run: npm run index:immutables -- --overlap 8 --max-blocks 800 --concurrency 8 --delay 50
+          INDEX_DEADLINE_MS: '6000000'
+        run: npm run index:immutables -- --overlap 8 --max-blocks 800 --until-tip --concurrency 8 --delay 50
 
       - name: Publish public immutables.json
         env:
@@ -43,7 +44,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/immutables.json public/data/immutables.json data/.immutables-state.json
+          git add data/immutables.json public/data/immutables.json data/immutables-state.json public/data/immutables-state.json data/.immutables-state.json
           if git diff --staged --quiet; then
             echo "No immutables changes"
             exit 0

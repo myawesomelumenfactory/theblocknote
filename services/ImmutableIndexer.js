@@ -2,8 +2,8 @@ import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
 import path from 'node:path';
 import { decodeOpReturn } from './TheBlockNote.js';
+import { isProtocolMessage, recordsFromEsploraTxs } from './immutableProtocol.js';
 
-const PROTOCOL_RE = /^t\s+-?\d+\s+-?\d+/;
 const TOKEN_URL = 'https://login.blockstream.com/realms/blockstream-public/protocol/openid-connect/token';
 const ENTERPRISE_API = 'https://enterprise.blockstream.info/api';
 
@@ -96,10 +96,6 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function isProtocolMessage(text) {
-  return typeof text === 'string' && PROTOCOL_RE.test(text.trim());
-}
-
 async function fetchText(url, { retries = 6 } = {}) {
   let lastError;
 
@@ -172,32 +168,7 @@ function extractFromBlockchainInfoBlock(block, { protocolOnly }) {
 }
 
 function extractFromEsploraTxs(txs, blockTime, { protocolOnly }) {
-  const records = [];
-
-  for (const tx of txs) {
-    const txid = tx.txid;
-    const time = tx.status?.block_time || blockTime;
-    const vouts = tx.vout || [];
-
-    vouts.forEach((out, index) => {
-      const script = out.scriptpubkey;
-      if (out.scriptpubkey_type !== 'op_return' && !String(script || '').startsWith('6a')) {
-        return;
-      }
-
-      const value = decodeOpReturn(script);
-      if (!value) return;
-      if (protocolOnly && !isProtocolMessage(value)) return;
-
-      records.push({
-        index: `${txid}_${index}`,
-        time,
-        value,
-      });
-    });
-  }
-
-  return records;
+  return recordsFromEsploraTxs(txs, blockTime, protocolOnly);
 }
 
 async function fetchBlockViaRaw(explorer, height, options) {
@@ -285,6 +256,7 @@ export function parseArgs(argv = process.argv.slice(2)) {
     resume: true,
     overlap: 0,
     maxBlocks: null,
+    untilTip: false,
     out: path.resolve('data/immutables.json'),
   };
 
@@ -317,6 +289,8 @@ export function parseArgs(argv = process.argv.slice(2)) {
     } else if (arg === '--max-blocks') {
       options.maxBlocks = Math.max(1, Number.parseInt(next, 10));
       i++;
+    } else if (arg === '--until-tip') {
+      options.untilTip = true;
     } else if (arg === '--help' || arg === '-h') {
       options.help = true;
     }
@@ -340,12 +314,14 @@ Options:
   --all-op-return     Keep every OP_RETURN, not only protocol "t ..." lines
   --no-resume         Ignore checkpoint and rewrite the output file
   --overlap <n>       Re-scan the last n blocks before continuing to tip (default: 0)
-  --max-blocks <n>    Stop after n blocks this run (useful for CI)
+  --max-blocks <n>    Stop after n blocks this pass (useful for CI)
+  --until-tip         Keep scanning passes until chain tip or INDEX_DEADLINE_MS
 
 Examples:
   npm run index:immutables
   npm run index:immutables -- --from 906867 --to 910933
   npm run index:immutables -- --overlap 8
+  npm run index:immutables -- --overlap 8 --max-blocks 800 --until-tip
   npm run index:immutables -- --from 906867 --all-op-return
 `;
 }
@@ -353,22 +329,31 @@ Examples:
 export async function runIndexer(options) {
   loadDotEnv();
   const canonicalOut = path.resolve('data/immutables.json');
-  const statePath = path.join(path.dirname(options.out), '.immutables-state.json');
+  const legacyStatePath = path.join(path.dirname(options.out), '.immutables-state.json');
+  const statePath = path.join(path.dirname(options.out), 'immutables-state.json');
   const publicCopy =
     path.resolve(options.out) === canonicalOut
       ? path.resolve('public/data/immutables.json')
       : null;
+  const publicState =
+    path.resolve(options.out) === canonicalOut
+      ? path.resolve('public/data/immutables-state.json')
+      : null;
 
   let from = options.from;
   let records = [];
+  let lastHeight = null;
 
   if (options.resume) {
-    const state = await readJsonIfExists(statePath, null);
+    const state =
+      (await readJsonIfExists(statePath, null)) ||
+      (await readJsonIfExists(legacyStatePath, null));
     const existing = await readJsonIfExists(options.out, []);
     if (Array.isArray(existing) && existing.length) {
       records = existing;
     }
     if (state?.lastHeight != null) {
+      lastHeight = state.lastHeight;
       const overlap = Number.isFinite(options.overlap) ? options.overlap : 0;
       from = Math.max(options.from, state.lastHeight - overlap + 1);
       console.log(
@@ -383,7 +368,8 @@ export async function runIndexer(options) {
     }
   }
 
-  let to = options.to ?? (await fetchTipHeight());
+  const tip = await fetchTipHeight();
+  let to = options.to ?? tip;
   if (options.maxBlocks) {
     to = Math.min(to, from + options.maxBlocks - 1);
   }
@@ -392,12 +378,21 @@ export async function runIndexer(options) {
     throw new Error('Invalid --from / --to height');
   }
   if (from > to) {
-    console.log(`Already up to date (from ${from} > to ${to}).`);
-    return { from, to, count: records.length, out: options.out };
+    console.log(`Already up to date (from ${from} > to ${to}, tip ${tip}).`);
+    return {
+      from,
+      to,
+      tip,
+      lastHeight: lastHeight ?? to,
+      count: records.length,
+      caughtUp: (lastHeight ?? to) >= tip,
+      stopped: false,
+      out: options.out,
+    };
   }
 
   console.log(
-    `Indexing blocks ${from} → ${to} (${options.protocolOnly ? 'protocol t … only' : 'all OP_RETURN'}, concurrency ${options.concurrency})`
+    `Indexing blocks ${from} → ${to} of tip ${tip} (${options.protocolOnly ? 'protocol t … only' : 'all OP_RETURN'}, concurrency ${options.concurrency})`
   );
 
   let shouldStop = false;
@@ -444,6 +439,7 @@ export async function runIndexer(options) {
         }
       }
 
+      lastHeight = batchEnd;
       const scanned = batchEnd - startHeight + 1;
       const span = Math.max(1, to - startHeight + 1);
       const percent = Math.min(100, (scanned / span) * 100);
@@ -459,12 +455,19 @@ export async function runIndexer(options) {
         lastHeight: batchEnd,
         from: options.from,
         to,
+        tip,
         count: records.length,
         updatedAt: new Date().toISOString(),
       };
-      const prev = await readJsonIfExists(statePath, null);
+      const prev =
+        (await readJsonIfExists(statePath, null)) ||
+        (await readJsonIfExists(legacyStatePath, null));
       if (prev?.lastHeight !== nextState.lastHeight || prev?.count !== nextState.count) {
         await writeJson(statePath, nextState);
+        await writeJson(legacyStatePath, nextState);
+        if (publicState) {
+          await writeJson(publicState, nextState);
+        }
       }
     }
   } finally {
@@ -473,5 +476,49 @@ export async function runIndexer(options) {
   }
 
   console.log(`Wrote ${records.length} messages to ${options.out}`);
-  return { from, to, count: records.length, out: options.out };
+  return {
+    from,
+    to,
+    tip,
+    lastHeight,
+    count: records.length,
+    caughtUp: (lastHeight ?? 0) >= tip,
+    stopped: shouldStop,
+    out: options.out,
+  };
+}
+
+export async function runIndexerUntilTip(options) {
+  const deadlineMs = Number.parseInt(process.env.INDEX_DEADLINE_MS || '0', 10);
+  const publishBufferMs = 8 * 60 * 1000;
+  const started = Date.now();
+  let result;
+
+  while (true) {
+    if (
+      result &&
+      deadlineMs &&
+      Date.now() - started > Math.max(0, deadlineMs - publishBufferMs)
+    ) {
+      console.log(
+        `Leaving time to publish; lastHeight ${result.lastHeight} / tip ${result.tip}`
+      );
+      return result;
+    }
+
+    result = await runIndexer(options);
+    if (result.stopped || result.caughtUp) {
+      if (result.caughtUp) {
+        console.log(`Caught up to tip ${result.tip} (${result.count} messages)`);
+      }
+      return result;
+    }
+
+    if (deadlineMs && Date.now() - started >= deadlineMs) {
+      console.log(
+        `Reached time budget at block ${result.lastHeight} / tip ${result.tip}`
+      );
+      return result;
+    }
+  }
 }

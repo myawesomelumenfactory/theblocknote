@@ -1,4 +1,4 @@
-import { helpText, parseArgs, runIndexer } from '../services/ImmutableIndexer.js';
+import { helpText, parseArgs, runIndexer, runIndexerUntilTip } from '../services/ImmutableIndexer.js';
 
 const options = parseArgs();
 
@@ -8,7 +8,11 @@ if (options.help) {
 }
 
 try {
-  await runIndexer(options);
+  if (options.untilTip) {
+    await runIndexerUntilTip(options);
+  } else {
+    await runIndexer(options);
+  }
 } catch (error) {
   console.error(error.message);
   process.exit(1);

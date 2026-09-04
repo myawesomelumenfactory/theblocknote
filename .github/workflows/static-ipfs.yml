@@ -7,6 +7,8 @@ on:
       - 'data/immutables.json'
       - 'public/data/immutables.json'
       - 'data/.immutables-state.json'
+      - 'data/immutables-state.json'
+      - 'public/data/immutables-state.json'
   pull_request:
   workflow_dispatch:
 
