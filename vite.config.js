@@ -7,6 +7,7 @@ import { nodePolyfills } from 'vite-plugin-node-polyfills'
 import { viteSingleFile } from 'vite-plugin-singlefile'
 import wasm from 'vite-plugin-wasm';
 import { blockstreamEnterpriseProxy } from './plugins/blockstreamEnterpriseProxy.js'
+import { immutablesAppend } from './plugins/immutablesAppend.js'
 
 function serveDataDir() {
   return {
@@ -64,6 +65,7 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
       wasm(),
       immutablesModule(),
+      immutablesAppend(),
       serveDataDir(),
       blockstreamEnterpriseProxy(env),
       nodePolyfills({

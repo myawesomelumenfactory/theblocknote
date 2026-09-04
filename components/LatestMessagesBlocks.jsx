@@ -4,6 +4,7 @@ import GlassCard from "./GlassCard";
 import { decodeOpReturn } from '../services/TheBlockNote';
 import { Activity, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { applyVoteUp, applyVoteDown, getHighestFundedUnit } from '../services/BitcoinService';
+import { appendImmutable, mergeImmutables, readImmutablesOverlay } from '../services/ImmutablesStore';
 import immutablesData from 'virtual:immutables';
 import { SharedContext } from '../src/SharedContext';
 
@@ -17,8 +18,10 @@ export default function LatestMessagesBlocks() {
   const [txids, setTxids] = useState([]);
   const [votedMessages, setVotedMessages] = useState(new Set()); // Track voted messages
   const [page, setPage] = useState(0);
-  const { refs, setRefs } = useContext(SharedContext);
-  const { currentIndex, setCurrentIndex } = useContext(SharedContext);
+  const [voteNotice, setVoteNotice] = useState(null);
+  const [votingIndex, setVotingIndex] = useState(null);
+  const { refs, ensureUtxoHex } = useContext(SharedContext);
+  const hasFundedUnit = Boolean(getHighestFundedUnit(Array.isArray(refs) ? refs : [], 450));
 
   function formatTimestampToUTC(timestampInSeconds) {
     const date = new Date(timestampInSeconds * 1000); // convert seconds to ms
@@ -34,61 +37,62 @@ export default function LatestMessagesBlocks() {
     return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss} UTC`;
   }
 
-  // Handle vote up
-  const handleVoteUp = async (messageIndex) => {
-    setTheBlockNote(prev => 
-      prev.map((msg, idx) => 
-        idx === messageIndex 
-          ? { ...msg, ups: msg.ups + 1 }
-          : msg
-      )
-    );
-    setVotedMessages(prev => new Set([...prev, `${messageIndex}-up`]));
-
-    const parts = messageIndex.split("_"); 
-    var hash = parts[0];
-    var index = parts[1];
-
-    const currentUTXO = getHighestFundedUnit(refs, 450) || refs[currentIndex];
-
-    // Send the transaction for voting up
-    const result = await applyVoteUp(currentUTXO, hash, index, 450);
-
-    if (result.success) {
-      console.log(`Transaction successful! View at: ${result.explorerUrl}`);
+  const handleVote = async (messageIndex, direction) => {
+    const selectedUnit = getHighestFundedUnit(Array.isArray(refs) ? refs : [], 450);
+    if (!selectedUnit) {
+      setVoteNotice({ type: 'error', text: 'Load a funded unit on Spark before voting.' });
+      return;
     }
 
-    // Here you would typically send the vote to your backend/blockchain
-    console.log(`Voted up message at index ${messageIndex}`);
-  };
+    setVotingIndex(messageIndex);
+    setVoteNotice(null);
 
-  // Handle vote down
-  const handleVoteDown = async (messageIndex) => {
-    setTheBlockNote(prev => 
-      prev.map((msg, idx) => 
-        idx === messageIndex 
-          ? { ...msg, downs: msg.downs + 1 }
-          : msg
-      )
-    );
-    setVotedMessages(prev => new Set([...prev, `${messageIndex}-down`]));
+    try {
+      const parts = messageIndex.split('_');
+      const hash = parts[0];
+      const vout = parts[1];
+      const utxo = ensureUtxoHex ? await ensureUtxoHex(selectedUnit.index) : selectedUnit;
+      const result = direction === 'up'
+        ? await applyVoteUp(utxo, hash, vout, 450)
+        : await applyVoteDown(utxo, hash, vout, 450);
 
-    const parts = messageIndex.split("_"); 
-    var hash = parts[0];
-    var index = parts[1];
+      if (!result.success) {
+        setVoteNotice({ type: 'error', text: result.error || 'The vote could not be sent.' });
+        return;
+      }
 
-    const currentUTXO = getHighestFundedUnit(refs, 450) || refs[currentIndex];
+      await appendImmutable({
+        index: `${result.transactionId}_0`,
+        time: Math.floor(Date.now() / 1000),
+        value: direction === 'up' ? `t 0 1 ${hash} ${vout}` : `t 0 -1 ${hash} ${vout}`,
+      });
 
-    // Send the transaction for voting down
-    const result = await applyVoteDown(currentUTXO, hash, index, 450);
-
-    if (result.success) {
-      console.log(`Transaction successful! View at: ${result.explorerUrl}`);
+      setTheBlockNote((prev) =>
+        prev.map((msg) =>
+          msg.index === messageIndex
+            ? {
+                ...msg,
+                ups: direction === 'up' ? msg.ups + 1 : msg.ups,
+                downs: direction === 'down' ? msg.downs + 1 : msg.downs,
+              }
+            : msg
+        )
+      );
+      setVotedMessages((prev) => new Set([...prev, `${messageIndex}-${direction}`]));
+      setVoteNotice({
+        type: 'success',
+        text: direction === 'up' ? 'Up vote recorded on the blockchain.' : 'Down vote recorded on the blockchain.',
+        url: result.explorerUrl,
+      });
+    } catch (error) {
+      setVoteNotice({ type: 'error', text: error.message || 'The vote could not be sent.' });
+    } finally {
+      setVotingIndex(null);
     }
-
-    // Here you would typically send the vote to your backend/blockchain
-    console.log(`Voted down message at index ${messageIndex}`);
   };
+
+  const handleVoteUp = (messageIndex) => handleVote(messageIndex, 'up');
+  const handleVoteDown = (messageIndex) => handleVote(messageIndex, 'down');
 
   function loadMessages() {
     console.log('--- CURRENT BLOCK HEX ---');
@@ -323,13 +327,29 @@ export default function LatestMessagesBlocks() {
 
     theblocknote.sort((a, b) => b.time - a.time);
     setTheBlockNote(theblocknote);
+
+    const rememberedVotes = new Set();
+    for (const row of readImmutablesOverlay()) {
+      const matched = String(row?.value || '').match(/"([^"]+)"|[^\s"]+/g);
+      if (!matched) continue;
+      const parts = matched.map((part) => part.replace(/^"|"$/g, ''));
+      if (parts[0] !== 't') continue;
+      const type = parts[2];
+      const target = `${parts[3]}_${parts[4]}`;
+      if (type === '1') rememberedVotes.add(`${target}-up`);
+      if (type === '-1') rememberedVotes.add(`${target}-down`);
+    }
+    setVotedMessages(rememberedVotes);
     } catch (error) {
       console.error('Failed to load immutables.json', error);
     }
   }
 
   const fetchMessages = async() => {
-    return Array.isArray(immutablesData) ? immutablesData : [];
+    return mergeImmutables(
+      Array.isArray(immutablesData) ? immutablesData : [],
+      readImmutablesOverlay()
+    );
   }
 
   useEffect(() => {
@@ -365,6 +385,35 @@ export default function LatestMessagesBlocks() {
           <h2 className="text-2xl font-bold text-white">Latest Messages</h2>
       </div>
 
+      {voteNotice?.type === 'success' && (
+        <div className="p-4 mb-4 text-md text-white rounded-lg bg-white/10" role="status">
+          <span className="font-bold">{voteNotice.text}</span>
+          {voteNotice.url && (
+            <>
+              {' '}
+              <a
+                href={voteNotice.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline text-white/80 hover:text-white"
+              >
+                Verify
+              </a>
+            </>
+          )}
+        </div>
+      )}
+      {voteNotice?.type === 'error' && (
+        <div className="p-4 mb-4 text-md text-red-800 rounded-lg bg-red-50 dark:bg-red-900/20 dark:text-red-300" role="alert">
+          <span className="font-bold">Error:</span> {voteNotice.text}
+        </div>
+      )}
+      {!hasFundedUnit && (
+        <p className="text-white/50 text-sm mb-4">
+          Voting needs a funded unit from Spark.
+        </p>
+      )}
+
       <ul>
         {pagedMessages.map((t, index) => (
           <motion.div 
@@ -390,11 +439,15 @@ export default function LatestMessagesBlocks() {
               <div className="flex items-center justify-center gap-4 pt-4 border-t border-white/10">
                 {/* Vote Up Button */}
                 <button
+                  type="button"
                   onClick={() => handleVoteUp(t.index)}
-                  disabled={votedMessages.has(`${t.index}-up`) || votedMessages.has(`${t.index}-down`)}
+                  disabled={!hasFundedUnit || votingIndex === t.index || votedMessages.has(`${t.index}-up`) || votedMessages.has(`${t.index}-down`)}
+                  title={!hasFundedUnit ? 'Load a funded unit on Spark to vote' : undefined}
                   className={`
                     flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200
-                    ${votedMessages.has(`${t.index}-up`)
+                    ${!hasFundedUnit || votingIndex === t.index
+                      ? 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
+                      : votedMessages.has(`${t.index}-up`)
                       ? 'bg-green-500/30 text-green-400 cursor-not-allowed'
                       : votedMessages.has(`${t.index}-down`)
                       ? 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
@@ -408,11 +461,15 @@ export default function LatestMessagesBlocks() {
                 
                 {/* Vote Down Button */}
                 <button
+                  type="button"
                   onClick={() => handleVoteDown(t.index)}
-                  disabled={votedMessages.has(`${t.index}-up`) || votedMessages.has(`${t.index}-down`)}
+                  disabled={!hasFundedUnit || votingIndex === t.index || votedMessages.has(`${t.index}-up`) || votedMessages.has(`${t.index}-down`)}
+                  title={!hasFundedUnit ? 'Load a funded unit on Spark to vote' : undefined}
                   className={`
                     flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200
-                    ${votedMessages.has(`${t.index}-down`)
+                    ${!hasFundedUnit || votingIndex === t.index
+                      ? 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
+                      : votedMessages.has(`${t.index}-down`)
                       ? 'bg-red-500/30 text-red-400 cursor-not-allowed'
                       : votedMessages.has(`${t.index}-up`)
                       ? 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
