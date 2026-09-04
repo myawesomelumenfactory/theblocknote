@@ -51,18 +51,6 @@ export default defineConfig({
       },
     },
     viteSingleFile({ removeViteModuleLoader: true }),
-    {
-      name: 'classic-inline-script',
-      enforce: 'post',
-      closeBundle() {
-        const file = path.resolve('dist/index.html')
-        if (!fs.existsSync(file)) return
-        const html = fs
-          .readFileSync(file, 'utf8')
-          .replace(/<script type="module">/g, '<script>')
-        fs.writeFileSync(file, html)
-      },
-    },
   ],
 
   build: {
