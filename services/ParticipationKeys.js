@@ -22,6 +22,10 @@ export function writeStoredKeyPairs(keyPairs) {
   localStorage.setItem('keyPairs', JSON.stringify(keyPairs));
 }
 
+export function clearStoredKeyPairs() {
+  localStorage.removeItem('keyPairs');
+}
+
 export function addressFromWif(wif) {
   const keyPair = ECPair.fromWIF(wif, network);
   const { address } = bitcoin.payments.p2pkh({

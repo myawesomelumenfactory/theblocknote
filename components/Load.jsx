@@ -1,7 +1,7 @@
 
 import { motion } from "framer-motion";
 import GlassCard from "../components/GlassCard";
-import { Activity, Copy, Check, Eye, EyeOff, ChevronLeft, ChevronRight } from "lucide-react";
+import { Activity, Copy, Check, Eye, EyeOff, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 
 import QRCode from "react-qr-code";
 import React, { useEffect, useState, useContext } from 'react';
@@ -14,6 +14,7 @@ import {
     readStoredKeyPairs,
     serializeParticipationKeys,
     writeStoredKeyPairs,
+    clearStoredKeyPairs,
 } from '../services/ParticipationKeys';
 
 async function copyText(value) {
@@ -51,6 +52,7 @@ export default function Load() {
     const [revealed, setRevealed] = useState({});
     const [importError, setImportError] = useState(null);
     const [page, setPage] = useState(0);
+    const [confirmingClear, setConfirmingClear] = useState(false);
     const { refs, setCurrentIndex, addressFunds, fundsProgress, refreshRefs, ensureUtxoHex } = useContext(SharedContext);
 
     const applyKeys = (keyPairs, preferredAddress) => {
@@ -152,6 +154,11 @@ export default function Load() {
         markCopied(id);
     };
 
+    const handleClearAllKeys = () => {
+        clearStoredKeyPairs();
+        window.location.reload();
+    };
+
     const handleImport = async () => {
         setImportError(null);
         try {
@@ -248,18 +255,54 @@ export default function Load() {
                 <Activity className="w-6 h-6 text-blue-400" />
                 <h2 className="text-2xl font-bold text-white">Participation Keys</h2>
             </div>
-            {fundedAddresses.length > 0 && (
-                <button
-                    type="button"
-                    onClick={() => handleCopyKeys(fundedKeyPairs, 'all')}
-                    className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-white/10 text-white border border-white/10 hover:bg-white/20 transition-all duration-300"
-                >
-                    {copied === 'all' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                    <span className="text-sm font-medium">
-                        {copied === 'all' ? 'Copied all keys' : 'Copy all keys'}
-                    </span>
-                </button>
-            )}
+            <div className="flex flex-wrap items-center justify-end gap-2">
+                {fundedAddresses.length > 0 && (
+                    <button
+                        type="button"
+                        onClick={() => handleCopyKeys(fundedKeyPairs, 'all')}
+                        className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-white/10 text-white border border-white/10 hover:bg-white/20 transition-all duration-300"
+                    >
+                        {copied === 'all' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                        <span className="text-sm font-medium">
+                            {copied === 'all' ? 'Copied all keys' : 'Copy all keys'}
+                        </span>
+                    </button>
+                )}
+                {savedAddresses.length > 0 && !confirmingClear && (
+                    <button
+                        type="button"
+                        onClick={() => setConfirmingClear(true)}
+                        className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-red-500/15 text-red-200 border border-red-400/30 hover:bg-red-500/25 transition-all duration-300"
+                    >
+                        <Trash2 className="w-4 h-4" />
+                        <span className="text-sm font-medium">Clear all keys</span>
+                    </button>
+                )}
+                {confirmingClear && (
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <span className="text-sm text-orange-200">
+                            Remove every participation key from this browser?
+                        </span>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setConfirmingClear(false)}
+                                className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-white/10 text-white border border-white/10 hover:bg-white/20 transition-all duration-300"
+                            >
+                                <span className="text-sm font-medium">Cancel</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleClearAllKeys}
+                                className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-red-500/80 text-white border border-red-300/40 hover:bg-red-500 transition-all duration-300"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                <span className="text-sm font-medium">Clear keys</span>
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
 
         <p className="text-white/60 text-sm mb-6">
