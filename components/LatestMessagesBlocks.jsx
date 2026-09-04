@@ -329,7 +329,7 @@ export default function LatestMessagesBlocks() {
     var immutables = [];
     const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-    const res = await fetch('/data/immutables.json');
+    const res = await fetch(`${import.meta.env.BASE_URL}data/immutables.json`);
     if (!res.ok) throw new Error('Failed to load input file');
     const data = await res.json();
 

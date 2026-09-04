@@ -50,4 +50,6 @@ export default defineConfig({
   build: {
     target: 'esnext',
   },
+  // Relative URLs so the static build works on IPFS gateways (/ipfs/<cid>/...)
+  base: './',
 })

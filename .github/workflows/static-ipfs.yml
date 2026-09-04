@@ -1,0 +1,109 @@
+name: Static build and IPFS
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  statuses: write
+  pull-requests: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Stage data for the static build
+        run: |
+          mkdir -p public/data
+          cp -f data/immutables.json public/data/immutables.json
+          cp -f data/scripts.json public/data/scripts.json 2>/dev/null || true
+          cp -f data/txids.json public/data/txids.json 2>/dev/null || true
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload static assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: theblocknote-dist
+          path: dist
+          if-no-files-found: error
+
+      - name: Pack IPFS CAR
+        id: ipfs
+        uses: ipfs/ipfs-deploy-action@v2
+        with:
+          path-to-deploy: dist
+          github-token: ${{ github.token }}
+
+      - name: Upload IPFS CAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: theblocknote-ipfs-car
+          path: ${{ steps.ipfs.outputs.car-path }}
+          if-no-files-found: error
+
+      - name: Write CID summary
+        env:
+          CID: ${{ steps.ipfs.outputs.cid }}
+        run: |
+          {
+            echo "## The Block Note static build"
+            echo
+            echo "**IPFS CID:** \`${CID}\`"
+            echo
+            echo "Gateway links (content is available on the public network after pinning):"
+            echo
+            echo "- https://dweb.link/ipfs/${CID}/"
+            echo "- https://ipfs.io/ipfs/${CID}/"
+            echo
+            if [ -z "${{ secrets.PINATA_JWT_TOKEN }}" ]; then
+              echo "No \`PINATA_JWT_TOKEN\` secret is set, so this CID was packed but not pinned."
+              echo "Add a Pinata JWT at https://app.pinata.cloud/developers/api-keys as the repo secret \`PINATA_JWT_TOKEN\` to publish on IPFS from CI."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "cid=${CID}" >> "$GITHUB_OUTPUT"
+
+      - name: Pin CAR to Pinata
+        if: ${{ secrets.PINATA_JWT_TOKEN != '' }}
+        env:
+          PINATA_JWT_TOKEN: ${{ secrets.PINATA_JWT_TOKEN }}
+          CID: ${{ steps.ipfs.outputs.cid }}
+          CAR_PATH: ${{ steps.ipfs.outputs.car-path }}
+        run: |
+          PIN_NAME="${GITHUB_REPOSITORY//\//-}-${GITHUB_SHA:0:7}"
+          response=$(curl -sS -w "\n%{http_code}" -X POST \
+            "https://uploads.pinata.cloud/v3/files" \
+            -H "Authorization: Bearer ${PINATA_JWT_TOKEN}" \
+            -F "network=public" \
+            -F "file=@${CAR_PATH}" \
+            -F "name=${PIN_NAME}" \
+            -F "car=true")
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+          if [ "$http_code" != "200" ]; then
+            echo "::error::Pinata upload failed (HTTP $http_code): $body"
+            exit 1
+          fi
+          returned_cid=$(echo "$body" | jq -r '.data.cid')
+          echo "Pinned to Pinata as ${PIN_NAME} (CID ${returned_cid})"
+          {
+            echo
+            echo "Pinned on Pinata."
+            echo "- https://dweb.link/ipfs/${returned_cid}/"
+          } >> "$GITHUB_STEP_SUMMARY"

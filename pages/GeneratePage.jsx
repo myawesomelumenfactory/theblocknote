@@ -83,7 +83,7 @@ const GeneratePage = () => {
     const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
     try {
-      const res = await fetch('/data/scripts.json');
+      const res = await fetch(`${import.meta.env.BASE_URL}data/scripts.json`);
       if (!res.ok) throw new Error('Failed to load input file');
       const data = await res.json();
   
@@ -131,7 +131,7 @@ const GeneratePage = () => {
     let txs = [];
   
     try {
-      const res = await fetch('/data/txids.json');
+      const res = await fetch(`${import.meta.env.BASE_URL}data/txids.json`);
       if (!res.ok) throw new Error('Failed to load input file');
       const data = await res.json();
   
