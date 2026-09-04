@@ -2,7 +2,7 @@ import React, { useEffect, useState, useContext } from 'react';
 import { motion } from "framer-motion";
 import GlassCard from "./GlassCard";
 import { decodeOpReturn } from '../services/TheBlockNote';
-import { Activity, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { Activity, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, List } from "lucide-react";
 import { applyVoteUp, applyVoteDown, getHighestFundedUnit } from '../services/BitcoinService';
 import { appendImmutable, loadImmutableRecords, readImmutablesOverlay } from '../services/ImmutablesStore';
 import immutablesData from 'virtual:immutables';
@@ -20,6 +20,7 @@ export default function LatestMessagesBlocks() {
   const [page, setPage] = useState(0);
   const [voteNotice, setVoteNotice] = useState(null);
   const [votingIndex, setVotingIndex] = useState(null);
+  const [openVoteLists, setOpenVoteLists] = useState(() => new Set());
   const { refs, ensureUtxoHex } = useContext(SharedContext);
   const hasFundedUnit = Boolean(getHighestFundedUnit(Array.isArray(refs) ? refs : [], 450));
 
@@ -35,6 +36,23 @@ export default function LatestMessagesBlocks() {
     const ss = String(date.getUTCSeconds()).padStart(2, '0');
   
     return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss} UTC`;
+  }
+
+  function voteTxidFromIndex(index) {
+    return String(index || '').split('_')[0];
+  }
+
+  function voteExplorerUrl(txid) {
+    return `https://mempool.space/tx/${txid}`;
+  }
+
+  function toggleVoteList(messageIndex) {
+    setOpenVoteLists((prev) => {
+      const next = new Set(prev);
+      if (next.has(messageIndex)) next.delete(messageIndex);
+      else next.add(messageIndex);
+      return next;
+    });
   }
 
   const handleVote = async (messageIndex, direction) => {
@@ -67,6 +85,12 @@ export default function LatestMessagesBlocks() {
         value: direction === 'up' ? `t 0 1 ${hash} ${vout}` : `t 0 -1 ${hash} ${vout}`,
       });
 
+      const newVote = {
+        txid: result.transactionId,
+        time: Math.floor(Date.now() / 1000),
+        direction,
+      };
+
       setTheBlockNote((prev) =>
         prev.map((msg) =>
           msg.index === messageIndex
@@ -74,10 +98,12 @@ export default function LatestMessagesBlocks() {
                 ...msg,
                 ups: direction === 'up' ? msg.ups + 1 : msg.ups,
                 downs: direction === 'down' ? msg.downs + 1 : msg.downs,
+                votes: [...(msg.votes || []), newVote],
               }
             : msg
         )
       );
+      setOpenVoteLists((prev) => new Set([...prev, messageIndex]));
       setVotedMessages((prev) => new Set([...prev, `${messageIndex}-${direction}`]));
       setVoteNotice({
         type: 'success',
@@ -279,7 +305,8 @@ export default function LatestMessagesBlocks() {
             "index": m.index,
             "value": message,
             "downs": 0,
-            "ups": 0
+            "ups": 0,
+            "votes": []
           });
        }
 
@@ -289,7 +316,8 @@ export default function LatestMessagesBlocks() {
           downs.push({
             "time": m.time,
             "hash": hash,
-            "index": parseInt(index)
+            "index": parseInt(index),
+            "txid": voteTxidFromIndex(m.index)
           });
         }
 
@@ -299,7 +327,8 @@ export default function LatestMessagesBlocks() {
           ups.push({
             "time": m.time,
             "hash": hash,
-            "index": parseInt(index)
+            "index": parseInt(index),
+            "txid": voteTxidFromIndex(m.index)
           });
         }
       }
@@ -315,14 +344,25 @@ export default function LatestMessagesBlocks() {
       downs.forEach(down => {
         if ( down.hash === hash && down.index == index ) {
           m.downs++;
+          m.votes.push({
+            txid: down.txid,
+            time: down.time,
+            direction: 'down',
+          });
         }
       });
 
       ups.forEach(up => {
         if ( up.hash === hash && up.index == index ) {
           m.ups++;
+          m.votes.push({
+            txid: up.txid,
+            time: up.time,
+            direction: 'up',
+          });
         }
       });
+      m.votes.sort((a, b) => b.time - a.time);
     })
 
     theblocknote.sort((a, b) => b.time - a.time);
@@ -481,6 +521,54 @@ export default function LatestMessagesBlocks() {
                   <ChevronDown className="w-4 h-4" />
                   <span className="text-sm font-medium">{t.downs}</span>
                 </button>
+              </div>
+
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => toggleVoteList(t.index)}
+                  aria-expanded={openVoteLists.has(t.index)}
+                  className="flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors"
+                >
+                  <List className="w-4 h-4" />
+                  <span>
+                    {openVoteLists.has(t.index) ? 'Hide votes' : 'Show votes'}
+                    {` (${(t.votes || []).length})`}
+                  </span>
+                  <ChevronDown
+                    className={`w-4 h-4 transition-transform ${openVoteLists.has(t.index) ? 'rotate-180' : ''}`}
+                  />
+                </button>
+
+                {openVoteLists.has(t.index) && (
+                  <ul className="mt-3 space-y-2">
+                    {(t.votes || []).length === 0 ? (
+                      <li className="text-white/40 text-sm">No votes on chain yet.</li>
+                    ) : (
+                      (t.votes || []).map((vote) => (
+                        <li
+                          key={`${vote.txid}-${vote.direction}-${vote.time}`}
+                          className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2"
+                        >
+                          <div className="flex items-center justify-between gap-3 mb-1">
+                            <span className={`text-xs font-medium ${vote.direction === 'up' ? 'text-green-400' : 'text-red-400'}`}>
+                              {vote.direction === 'up' ? 'Up vote' : 'Down vote'}
+                            </span>
+                            <span className="text-white/40 text-xs">{formatTimestampToUTC(vote.time)}</span>
+                          </div>
+                          <a
+                            href={voteExplorerUrl(vote.txid)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-mono text-xs text-white/80 hover:text-white break-all underline decoration-white/20 hover:decoration-white/60"
+                          >
+                            {vote.txid}
+                          </a>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                )}
               </div>
             </div>
           </GlassCard> }
