@@ -19,8 +19,7 @@ theblocknote/
 # Vite
 .vite/
 
-# Indexer checkpoint and bulky chain dumps
-data/.immutables-state.json
+# Indexer bulky chain dumps
 data/from_*.json
 data/blocks_*.json
 data/txs*.json

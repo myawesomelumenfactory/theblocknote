@@ -1,5 +1,9 @@
 const OVERLAY_KEY = 'immutablesOverlay'
 
+export const PUBLISHED_IMMUTABLES_URL =
+  import.meta.env.VITE_IMMUTABLES_URL ||
+  'https://raw.githubusercontent.com/myawesomelumenfactory/theblocknote/main/public/data/immutables.json'
+
 export function readImmutablesOverlay() {
   try {
     const parsed = JSON.parse(localStorage.getItem(OVERLAY_KEY) || '[]')
@@ -33,4 +37,25 @@ export async function appendImmutable(entry) {
   }
 
   return overlay
+}
+
+async function fetchImmutableList(url) {
+  try {
+    const response = await fetch(url, { cache: 'no-store' })
+    if (!response.ok) return []
+    const data = await response.json()
+    return Array.isArray(data) ? data : []
+  } catch {
+    return []
+  }
+}
+
+export async function loadImmutableRecords(bundled) {
+  let records = Array.isArray(bundled) ? bundled : []
+  records = mergeImmutables(
+    records,
+    await fetchImmutableList(`${import.meta.env.BASE_URL}data/immutables.json`)
+  )
+  records = mergeImmutables(records, await fetchImmutableList(PUBLISHED_IMMUTABLES_URL))
+  return mergeImmutables(records, readImmutablesOverlay())
 }

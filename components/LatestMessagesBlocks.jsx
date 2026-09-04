@@ -4,7 +4,7 @@ import GlassCard from "./GlassCard";
 import { decodeOpReturn } from '../services/TheBlockNote';
 import { Activity, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { applyVoteUp, applyVoteDown, getHighestFundedUnit } from '../services/BitcoinService';
-import { appendImmutable, mergeImmutables, readImmutablesOverlay } from '../services/ImmutablesStore';
+import { appendImmutable, loadImmutableRecords, readImmutablesOverlay } from '../services/ImmutablesStore';
 import immutablesData from 'virtual:immutables';
 import { SharedContext } from '../src/SharedContext';
 
@@ -346,17 +346,7 @@ export default function LatestMessagesBlocks() {
   }
 
   const fetchMessages = async() => {
-    let base = Array.isArray(immutablesData) ? immutablesData : [];
-    try {
-      const response = await fetch(`${import.meta.env.BASE_URL}data/immutables.json`);
-      if (response.ok) {
-        const data = await response.json();
-        if (Array.isArray(data) && data.length) base = data;
-      }
-    } catch {
-      // Fall back to the bundled snapshot.
-    }
-    return mergeImmutables(base, readImmutablesOverlay());
+    return loadImmutableRecords(immutablesData);
   }
 
   useEffect(() => {

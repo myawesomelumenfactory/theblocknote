@@ -3,6 +3,10 @@ name: Build static assets
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'data/immutables.json'
+      - 'public/data/immutables.json'
+      - 'data/.immutables-state.json'
   pull_request:
   workflow_dispatch:
 

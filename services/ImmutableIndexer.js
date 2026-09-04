@@ -283,6 +283,8 @@ export function parseArgs(argv = process.argv.slice(2)) {
     concurrency: 6,
     protocolOnly: true,
     resume: true,
+    overlap: 0,
+    maxBlocks: null,
     out: path.resolve('data/immutables.json'),
   };
 
@@ -309,6 +311,12 @@ export function parseArgs(argv = process.argv.slice(2)) {
       options.protocolOnly = false;
     } else if (arg === '--no-resume') {
       options.resume = false;
+    } else if (arg === '--overlap') {
+      options.overlap = Math.max(0, Number.parseInt(next, 10));
+      i++;
+    } else if (arg === '--max-blocks') {
+      options.maxBlocks = Math.max(1, Number.parseInt(next, 10));
+      i++;
     } else if (arg === '--help' || arg === '-h') {
       options.help = true;
     }
@@ -331,10 +339,13 @@ Options:
   --out <path>        Output file (default: data/immutables.json)
   --all-op-return     Keep every OP_RETURN, not only protocol "t ..." lines
   --no-resume         Ignore checkpoint and rewrite the output file
+  --overlap <n>       Re-scan the last n blocks before continuing to tip (default: 0)
+  --max-blocks <n>    Stop after n blocks this run (useful for CI)
 
 Examples:
   npm run index:immutables
   npm run index:immutables -- --from 906867 --to 910933
+  npm run index:immutables -- --overlap 8
   npm run index:immutables -- --from 906867 --all-op-return
 `;
 }
@@ -354,14 +365,29 @@ export async function runIndexer(options) {
   if (options.resume) {
     const state = await readJsonIfExists(statePath, null);
     const existing = await readJsonIfExists(options.out, []);
-    if (state?.lastHeight != null && Array.isArray(existing) && existing.length) {
+    if (Array.isArray(existing) && existing.length) {
       records = existing;
-      from = Math.max(from, state.lastHeight + 1);
-      console.log(`Resuming after block ${state.lastHeight} (${records.length} messages)`);
+    }
+    if (state?.lastHeight != null) {
+      const overlap = Number.isFinite(options.overlap) ? options.overlap : 0;
+      from = Math.max(options.from, state.lastHeight - overlap + 1);
+      console.log(
+        overlap > 0
+          ? `Resuming at block ${from} (last ${overlap} plus new blocks to tip, ${records.length} messages)`
+          : `Resuming after block ${state.lastHeight} (${records.length} messages)`
+      );
+    } else if (records.length) {
+      console.log(
+        `Keeping ${records.length} existing messages; no checkpoint, starting at ${from}`
+      );
     }
   }
 
-  const to = options.to ?? (await fetchTipHeight());
+  let to = options.to ?? (await fetchTipHeight());
+  if (options.maxBlocks) {
+    to = Math.min(to, from + options.maxBlocks - 1);
+  }
+  const startHeight = from;
   if (Number.isNaN(from) || Number.isNaN(to)) {
     throw new Error('Invalid --from / --to height');
   }
@@ -418,21 +444,28 @@ export async function runIndexer(options) {
         }
       }
 
+      const scanned = batchEnd - startHeight + 1;
+      const span = Math.max(1, to - startHeight + 1);
+      const percent = Math.min(100, (scanned / span) * 100);
       console.log(
-        `Blocks ${height}–${batchEnd}/${to} — +${added} message(s), ${records.length} total`
+        `Blocks ${height}–${batchEnd}/${to} — ${percent.toFixed(1)}% — ${to - batchEnd} left — +${added} message(s), ${records.length} total`
       );
 
       await writeJson(options.out, records);
       if (publicCopy) {
         await writeJson(publicCopy, records);
       }
-      await writeJson(statePath, {
+      const nextState = {
         lastHeight: batchEnd,
         from: options.from,
         to,
         count: records.length,
         updatedAt: new Date().toISOString(),
-      });
+      };
+      const prev = await readJsonIfExists(statePath, null);
+      if (prev?.lastHeight !== nextState.lastHeight || prev?.count !== nextState.count) {
+        await writeJson(statePath, nextState);
+      }
     }
   } finally {
     process.off('SIGINT', onSignal);

@@ -1,0 +1,57 @@
+name: Publish immutables.json
+
+on:
+  schedule:
+    # Bitcoin is ~1 block / 10 min; 30 min keeps the public file near tip
+    # after the index has caught up, and still walks forward during backfill.
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: index-immutables
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  index:
+    runs-on: ubuntu-latest
+    timeout-minutes: 110
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Index last 8 blocks plus new blocks toward tip
+        env:
+          BLOCKSTREAM_CLIENT_ID: ${{ secrets.BLOCKSTREAM_CLIENT_ID }}
+          BLOCKSTREAM_CLIENT_SECRET: ${{ secrets.BLOCKSTREAM_CLIENT_SECRET }}
+        run: npm run index:immutables -- --overlap 8 --max-blocks 800 --concurrency 8 --delay 50
+
+      - name: Publish public immutables.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/immutables.json public/data/immutables.json data/.immutables-state.json
+          if git diff --staged --quiet; then
+            echo "No immutables changes"
+            exit 0
+          fi
+          git commit -m "Publish latest immutables.json"
+          git pull --rebase origin HEAD
+          git push
+
+          if gh release view static >/dev/null 2>&1; then
+            gh release upload static public/data/immutables.json --clobber
+          fi
