@@ -7,6 +7,7 @@ import { useContext } from 'react';
 export default function UTXOCard({ utxo, index }) {
 
   const {currentIndex, setCurrentIndex } = useContext(SharedContext);
+  const confirmations = Number.isFinite(utxo.confirmations) ? utxo.confirmations : (utxo.confirmed ? 1 : 0);
 
   const formatSats = (sats) => {
     return new Intl.NumberFormat('en-US').format(sats);
@@ -80,17 +81,21 @@ export default function UTXOCard({ utxo, index }) {
       {/* Confirmations */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Clock className="w-4 h-4 text-gray-400" />
-          <span className={`text-sm font-medium ${getConfirmationColor(utxo.value)}`}>
-            {utxo.value} confirmations
+          <Clock className={`w-4 h-4 ${getConfirmationColor(confirmations)}`} />
+          <span className={`text-sm font-medium ${getConfirmationColor(confirmations)}`}>
+            {confirmations === 0
+              ? 'Unconfirmed'
+              : `${confirmations} confirmation${confirmations === 1 ? '' : 's'}`}
           </span>
         </div>
-        <div className="flex items-center gap-1">
-          <Shield className={`w-4 h-4 ${getConfirmationColor(utxo.value)}`} />
-          <span className="text-xs text-gray-400">
-            Block {utxo.value}
-          </span>
-        </div>
+        {utxo.blockHeight ? (
+          <div className="flex items-center gap-1">
+            <Shield className={`w-4 h-4 ${getConfirmationColor(confirmations)}`} />
+            <span className="text-xs text-gray-400">
+              Block {utxo.blockHeight}
+            </span>
+          </div>
+        ) : null}
       </div>
      
     </motion.div>

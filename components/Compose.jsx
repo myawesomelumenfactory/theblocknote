@@ -9,8 +9,7 @@ import { sendBitcoinTransaction, validateUTXO } from '../services/BitcoinService
 export default function Compose() {
   const [message, setMessage] = useState("");
   const [fee, setFee] = useState(null);
-  const { refs, setRefs } = useContext(SharedContext);
-  const { currentIndex, setCurrentIndex } = useContext(SharedContext);
+  const { refs, currentIndex, ensureUtxoHex } = useContext(SharedContext);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isDisabled, setIsDisabled] = useState(false);
@@ -32,9 +31,10 @@ export default function Compose() {
     setError(null);
 
     try {
-      const currentUTXO = refs[currentIndex];
-      
-      // Validate UTXO before proceeding
+      const currentUTXO = ensureUtxoHex
+        ? await ensureUtxoHex(currentIndex)
+        : refs[currentIndex];
+
       if (!validateUTXO(currentUTXO)) {
         throw new Error("Invalid UTXO data");
       }

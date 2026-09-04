@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Bitcoin, Menu, X } from "lucide-react";
-import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
-import PowerPage from "../pages/PowerPage";
+import { Link } from "react-router-dom";
 
 export default function Header() {
   const [shouldAnimate, setShouldAnimate] = useState(true);
@@ -81,10 +80,6 @@ export default function Header() {
           </div>
         </div>
       </nav>
-
-      <Routes>
-        <Route path="/power" element={<PowerPage />} />
-      </Routes>
     </motion.div>
   );
 }

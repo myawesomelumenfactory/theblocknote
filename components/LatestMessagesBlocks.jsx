@@ -4,7 +4,7 @@ import GlassCard from "./GlassCard";
 import { decodeOpReturn } from '../services/TheBlockNote';
 import { Activity, ChevronUp, ChevronDown } from "lucide-react";
 import { applyVoteUp, applyVoteDown } from '../services/BitcoinService';
-import immutablesData from '../data/immutables.json';
+import immutablesData from 'virtual:immutables';
 import { SharedContext } from '../src/SharedContext';
 
 export default function LatestMessagesBlocks() {
