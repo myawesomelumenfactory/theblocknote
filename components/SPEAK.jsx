@@ -17,9 +17,9 @@ export default function Speak() {
               duration: 3.2,
               ease: [0.4, 0, 0.2, 1] // Custom cubic-bezier for smooth, natural motion
               }}
-              className="glass-card rounded-2xl p-6"
+              className="w-full"
           >
-          {<GlassCard className="p-8 mb-8 max-w-5xl mx-auto">
+          {<GlassCard className="p-6 md:p-8 mb-6">
             <Introduction />
           </GlassCard> }
         </motion.div>
@@ -30,11 +30,11 @@ export default function Speak() {
             transition={{ 
             delay: 2,
             duration: 3.2,
-            ease: [0.4, 0, 0.2, 1] // Custom cubic-bezier for smooth, natural motion
+            ease: [0.4, 0, 0.2, 1]
             }}
-            className="glass-card rounded-2xl p-6"
+            className="w-full"
         >
-        {<GlassCard className="p-8 mb-8 max-w-5xl mx-auto">
+        {<GlassCard className="p-6 md:p-8">
             <Compose />
         </GlassCard> }
       </motion.div>

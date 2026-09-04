@@ -2,10 +2,12 @@ import React, { useEffect, useState, useContext } from 'react';
 import { motion } from "framer-motion";
 import GlassCard from "./GlassCard";
 import { decodeOpReturn } from '../services/TheBlockNote';
-import { Activity, ChevronUp, ChevronDown } from "lucide-react";
-import { applyVoteUp, applyVoteDown } from '../services/BitcoinService';
+import { Activity, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { applyVoteUp, applyVoteDown, getHighestFundedUnit } from '../services/BitcoinService';
 import immutablesData from 'virtual:immutables';
 import { SharedContext } from '../src/SharedContext';
+
+const PAGE_SIZE = 5;
 
 export default function LatestMessagesBlocks() {
 
@@ -14,6 +16,7 @@ export default function LatestMessagesBlocks() {
   const [theblocknote, setTheBlockNote] = useState([]);
   const [txids, setTxids] = useState([]);
   const [votedMessages, setVotedMessages] = useState(new Set()); // Track voted messages
+  const [page, setPage] = useState(0);
   const { refs, setRefs } = useContext(SharedContext);
   const { currentIndex, setCurrentIndex } = useContext(SharedContext);
 
@@ -46,7 +49,7 @@ export default function LatestMessagesBlocks() {
     var hash = parts[0];
     var index = parts[1];
 
-    const currentUTXO = refs[currentIndex];
+    const currentUTXO = getHighestFundedUnit(refs, 450) || refs[currentIndex];
 
     // Send the transaction for voting up
     const result = await applyVoteUp(currentUTXO, hash, index, 450);
@@ -74,7 +77,7 @@ export default function LatestMessagesBlocks() {
     var hash = parts[0];
     var index = parts[1];
 
-    const currentUTXO = refs[currentIndex];
+    const currentUTXO = getHighestFundedUnit(refs, 450) || refs[currentIndex];
 
     // Send the transaction for voting down
     const result = await applyVoteDown(currentUTXO, hash, index, 450);
@@ -333,6 +336,18 @@ export default function LatestMessagesBlocks() {
     fetchTheBlockNote();
   }, []);
 
+  useEffect(() => {
+    const lastPage = Math.max(0, Math.ceil(theblocknote.length / PAGE_SIZE) - 1);
+    setPage((current) => Math.min(current, lastPage));
+  }, [theblocknote.length]);
+
+  const totalPages = Math.max(1, Math.ceil(theblocknote.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages - 1);
+  const pagedMessages = theblocknote.slice(
+    currentPage * PAGE_SIZE,
+    currentPage * PAGE_SIZE + PAGE_SIZE
+  );
+
   return (
     <motion.div 
         initial={{ opacity: 0, y: 20, scale: 0.95 }}
@@ -342,28 +357,28 @@ export default function LatestMessagesBlocks() {
         duration: 3.2,
         ease: [0.4, 0, 0.2, 1] // Custom cubic-bezier for smooth, natural motion
         }}
-        className="glass-card rounded-2xl p-6"
+        className="w-full"
     >
-    {<GlassCard className="p-8 mb-8 max-w-5xl mx-auto">
+    {<GlassCard className="p-6 md:p-8">
       <div className="flex items-center gap-3 mb-6">
           <Activity className="w-6 h-6 text-blue-400" />
           <h2 className="text-2xl font-bold text-white">Latest Messages</h2>
       </div>
 
       <ul>
-        {theblocknote.map((t, index) => (
+        {pagedMessages.map((t, index) => (
           <motion.div 
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ 
-            delay: 2,
-            duration: 3.2,
-            ease: [0.4, 0, 0.2, 1] // Custom cubic-bezier for smooth, natural motion
+            delay: index * 0.05,
+            duration: 0.4,
+            ease: [0.4, 0, 0.2, 1]
           }}
-          className="glass-card rounded-2xl p-6"
+          className="mb-4"
           key={t.index}
           >
-          {<GlassCard className="p-8 mb-8 max-w-5xl mx-auto">
+          {<GlassCard className="p-5">
             <div className="space-y-4">
               {/* Message Content */}
               <div>
@@ -376,12 +391,12 @@ export default function LatestMessagesBlocks() {
                 {/* Vote Up Button */}
                 <button
                   onClick={() => handleVoteUp(t.index)}
-                  disabled={votedMessages.has(`${index}-up`) || votedMessages.has(`${index}-down`)}
+                  disabled={votedMessages.has(`${t.index}-up`) || votedMessages.has(`${t.index}-down`)}
                   className={`
                     flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200
-                    ${votedMessages.has(`${index}-up`)
+                    ${votedMessages.has(`${t.index}-up`)
                       ? 'bg-green-500/30 text-green-400 cursor-not-allowed'
-                      : votedMessages.has(`${index}-down`)
+                      : votedMessages.has(`${t.index}-down`)
                       ? 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
                       : 'bg-white/10 text-white hover:bg-green-500/20 hover:text-green-400 hover:scale-105'
                     }
@@ -394,12 +409,12 @@ export default function LatestMessagesBlocks() {
                 {/* Vote Down Button */}
                 <button
                   onClick={() => handleVoteDown(t.index)}
-                  disabled={votedMessages.has(`${index}-up`) || votedMessages.has(`${index}-down`)}
+                  disabled={votedMessages.has(`${t.index}-up`) || votedMessages.has(`${t.index}-down`)}
                   className={`
                     flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200
-                    ${votedMessages.has(`${index}-down`)
+                    ${votedMessages.has(`${t.index}-down`)
                       ? 'bg-red-500/30 text-red-400 cursor-not-allowed'
-                      : votedMessages.has(`${index}-up`)
+                      : votedMessages.has(`${t.index}-up`)
                       ? 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
                       : 'bg-white/10 text-white hover:bg-red-500/20 hover:text-red-400 hover:scale-105'
                     }
@@ -414,6 +429,40 @@ export default function LatestMessagesBlocks() {
           </motion.div>
         ))}
       </ul>
+
+      {theblocknote.length > PAGE_SIZE && (
+        <div className="flex items-center justify-center gap-4 mt-2">
+          <button
+            type="button"
+            onClick={() => setPage(Math.max(0, currentPage - 1))}
+            disabled={currentPage === 0}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all duration-300 ${
+              currentPage === 0
+                ? 'bg-gray-200/12 text-gray-400 border-white/10 cursor-not-allowed'
+                : 'bg-white/10 text-white border-white/10 hover:bg-white/20 cursor-pointer'
+            }`}
+          >
+            <ChevronLeft className="w-4 h-4" />
+            <span className="text-sm">Previous</span>
+          </button>
+          <span className="text-white/70 text-sm">
+            {currentPage + 1} / {totalPages}
+          </span>
+          <button
+            type="button"
+            onClick={() => setPage(Math.min(totalPages - 1, currentPage + 1))}
+            disabled={currentPage >= totalPages - 1}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all duration-300 ${
+              currentPage >= totalPages - 1
+                ? 'bg-gray-200/12 text-gray-400 border-white/10 cursor-not-allowed'
+                : 'bg-white/10 text-white border-white/10 hover:bg-white/20 cursor-pointer'
+            }`}
+          >
+            <span className="text-sm">Next</span>
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
     </GlassCard> }
     </motion.div>

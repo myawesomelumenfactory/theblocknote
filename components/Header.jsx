@@ -22,10 +22,10 @@ export default function Header() {
         duration: 1.2,
         ease: [0.4, 0, 0.2, 1],
       }}
-      className="glass-card rounded-2xl p-6"
+      className="w-full px-4 sm:px-6 lg:px-8 pt-4"
     >
-      <nav className="relative z-10 p-6">
-        <div className="max-w-5xl mx-auto">
+      <nav className="relative z-10">
+        <div className="w-full">
           <div className="backdrop-blur-xl bg-white-900/30 rounded-2xl border border-white/20 p-4 shadow-2xl">
             {/* Parent flex container, responsive */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">

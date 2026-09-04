@@ -7,6 +7,7 @@ import ReadPage from '../pages/ReadPage';
 import GeneratePage from '../pages/GeneratePage';
 import { SharedContext } from '../src/SharedContext';
 import { explorerJson, explorerText, explorerTipHeight } from '../services/BlockstreamExplorer';
+import { getHighestFundedUnit } from '../services/BitcoinService';
 
 const CONFIRMED_AFTER = 6;
 
@@ -276,6 +277,11 @@ function App() {
   useEffect(() => {
     fetchAddresses();
   }, [fetchAddresses]);
+
+  useEffect(() => {
+    const highest = getHighestFundedUnit(refs, 450);
+    setCurrentIndex(highest ? highest.index : null);
+  }, [refs]);
 
 
   return (

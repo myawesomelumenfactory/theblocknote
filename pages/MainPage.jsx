@@ -1,22 +1,23 @@
-import React, { useEffect, useState } from 'react';
 import Header from '../components/Header';
 import LatestMessagesBlocks from '../components/LatestMessagesBlocks';
-
 import SPEAK from '../components/SPEAK';
 
 function MainPage() {
-
   return (
     <>
-      <div>
-      <div className="h-screen bg-[radial-gradient(circle_at_center,_#3a5ca7_10%,_#1e2a4a_100%,_#0c0f1a_120%)] text-white relative overflow-x-hidden overflow-y-auto pb-50">
-        <Header/>
-        <SPEAK/>
-        <LatestMessagesBlocks/>
+      <Header />
+      <div className="w-full px-4 sm:px-6 lg:px-8 pt-4 pb-16">
+        <div className="flex flex-col lg:flex-row lg:items-start gap-6">
+          <div className="w-full lg:w-1/2 min-w-0">
+            <SPEAK />
+          </div>
+          <div className="w-full lg:w-1/2 min-w-0">
+            <LatestMessagesBlocks />
+          </div>
+        </div>
       </div>
-    </div>
     </>
-  )
+  );
 }
 
 export default MainPage

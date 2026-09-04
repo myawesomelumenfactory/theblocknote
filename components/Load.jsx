@@ -214,9 +214,9 @@ export default function Load() {
             duration: 0.8,
             ease: [0.4, 0, 0.2, 1]
             }}
-            className="glass-card rounded-2xl p-6"
+            className="w-full px-4 sm:px-6 lg:px-8 pt-4 pb-16"
         >
-        {<GlassCard className="p-8 mb-8 max-w-5xl mx-auto">
+        {<GlassCard className="p-6 md:p-8">
 
         <div className="flex items-center gap-3 mb-6">
             <Activity className="w-6 h-6 text-orange-400" />

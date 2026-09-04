@@ -216,6 +216,20 @@ function createSigningKeyPair(keyPair) {
   };
 }
 
+export function getHighestFundedUnit(units, fee = 450) {
+  if (!Array.isArray(units) || units.length === 0) return null;
+
+  let best = null;
+  for (const unit of units) {
+    const value = Number(unit?.value) || 0;
+    if (value <= fee) continue;
+    if (!best || value > (Number(best.value) || 0)) {
+      best = unit;
+    }
+  }
+  return best;
+}
+
 /**
  * Main function to create and broadcast a Bitcoin transaction
  * @param {Object} utxo - UTXO information

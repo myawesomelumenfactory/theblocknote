@@ -1,25 +1,23 @@
 // Compose.jsx
-import React, { useEffect, useState, useContext } from 'react';
+import React, { useState, useContext } from 'react';
 import { Activity } from "lucide-react";
 import TextInput from '../components/TextInput';
 import EmbedButton from '../components/EmbedButton';
 import { SharedContext } from '../src/SharedContext';
-import { sendBitcoinTransaction, validateUTXO } from '../services/BitcoinService';
+import { getHighestFundedUnit, sendBitcoinTransaction, validateUTXO } from '../services/BitcoinService';
 
 export default function Compose() {
   const [message, setMessage] = useState("");
-  const [fee, setFee] = useState(null);
-  const { refs, currentIndex, ensureUtxoHex } = useContext(SharedContext);
+  const fee = 450;
+  const { refs, setCurrentIndex, ensureUtxoHex } = useContext(SharedContext);
 
   const [isLoading, setIsLoading] = useState(false);
-  const [isDisabled, setIsDisabled] = useState(false);
   const [isEmbedded, setIsEmbedded] = useState(false);
   const [transactionID, setTransactionID] = useState(false);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    setFee(450);
-  }, []);
+  const fundedUnit = getHighestFundedUnit(refs, fee);
+  const hasFundedUnit = Boolean(fundedUnit);
 
   const handleSubmit = async () => {
     if (!message.trim()) {
@@ -27,13 +25,20 @@ export default function Compose() {
       return;
     }
 
+    const selectedUnit = getHighestFundedUnit(refs, fee);
+    if (!selectedUnit) {
+      setError("No funded unit available");
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
     try {
+      if (setCurrentIndex) setCurrentIndex(selectedUnit.index);
       const currentUTXO = ensureUtxoHex
-        ? await ensureUtxoHex(currentIndex)
-        : refs[currentIndex];
+        ? await ensureUtxoHex(selectedUnit.index)
+        : selectedUnit;
 
       if (!validateUTXO(currentUTXO)) {
         throw new Error("Invalid UTXO data");
@@ -90,10 +95,15 @@ export default function Compose() {
       <div className="flex items-center gap-3 mb-6">
         <EmbedButton
           onClick={handleSubmit}
-          disabled={isDisabled || !message.trim()}
+          disabled={!hasFundedUnit || !message.trim()}
           isLoading={isLoading}
         />
       </div>
+      {!hasFundedUnit && (
+        <p className="text-white/50 text-sm mb-6">
+          Send is unavailable until a funded unit is loaded on Spark.
+        </p>
+      )}
 
       {isEmbedded && (
         <div className="p-4 mb-4 text-md text-white-800 rounded-lg bg-green-80 dark:bg-gray-100/5 dark:text-white-300/80" role="alert">
