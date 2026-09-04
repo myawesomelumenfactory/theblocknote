@@ -1,0 +1,60 @@
+name: Continue immutables indexing
+
+on:
+  workflow_run:
+    workflows: ["Publish immutables.json"]
+    types: [completed]
+
+concurrency:
+  group: continue-immutables
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  restart:
+    if: github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout latest published checkpoint
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Start the next run if still behind tip
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          last=$(python3 - <<'PY'
+          import json
+          from pathlib import Path
+          heights = []
+          for name in (
+              'data/immutables-state.json',
+              'public/data/immutables-state.json',
+              'data/.immutables-state.json',
+          ):
+              path = Path(name)
+              if not path.exists():
+                  continue
+              height = json.loads(path.read_text()).get('lastHeight')
+              if height is not None:
+                  heights.append(int(height))
+          print(max(heights) if heights else 0)
+          PY
+          )
+          tip=$(curl -fsS https://mempool.space/api/blocks/tip/height)
+          echo "lastHeight=$last tip=$tip conclusion=${{ github.event.workflow_run.conclusion }}"
+          if [ -z "$tip" ]; then
+            echo "Could not read chain tip; starting the next run anyway"
+            gh workflow run index-immutables.yml --ref main --repo "$GITHUB_REPOSITORY"
+            exit 0
+          fi
+          if [ "$last" -ge "$tip" ]; then
+            echo "Caught up to tip; the 30-minute schedule will keep it current"
+            exit 0
+          fi
+          echo "Still behind tip; starting the next Publish immutables.json run"
+          gh workflow run index-immutables.yml --ref main --repo "$GITHUB_REPOSITORY"
