@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import GlassCard from "./GlassCard";
 import { decodeOpReturn } from '../services/TheBlockNote';
 import { Activity, ChevronUp, ChevronDown } from "lucide-react";
-import { applyVoteUp, applyVoteDown } from '../services/bitcoinService';
+import { applyVoteUp, applyVoteDown } from '../services/BitcoinService';
 import { SharedContext } from '../src/SharedContext';
 
 export default function LatestMessagesBlocks() {

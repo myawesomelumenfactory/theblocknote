@@ -4,7 +4,7 @@ import { Activity } from "lucide-react";
 import TextInput from '../components/TextInput';
 import EmbedButton from '../components/EmbedButton';
 import { SharedContext } from '../src/SharedContext';
-import { sendBitcoinTransaction, validateUTXO } from '../services/bitcoinService';
+import { sendBitcoinTransaction, validateUTXO } from '../services/BitcoinService';
 
 export default function Compose() {
   const [message, setMessage] = useState("");
