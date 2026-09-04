@@ -4,6 +4,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { nodePolyfills } from 'vite-plugin-node-polyfills'
+import { viteSingleFile } from 'vite-plugin-singlefile'
 import wasm from 'vite-plugin-wasm';
 
 function serveDataDir() {
@@ -36,19 +37,38 @@ export default defineConfig({
     wasm(),
     serveDataDir(),
     nodePolyfills({
-      // Whether to polyfill `node:` protocol imports.
       protocolImports: true,
-      // Whether to polyfill specific globals.
       globals: {
         Buffer: true,
         global: true,
         process: true,
       },
-    })
+    }),
+    {
+      name: 'strip-crossorigin',
+      transformIndexHtml(html) {
+        return html.replace(/\s+crossorigin(?:="[^"]*")?/g, '')
+      },
+    },
+    viteSingleFile({ removeViteModuleLoader: true }),
+    {
+      name: 'classic-inline-script',
+      enforce: 'post',
+      closeBundle() {
+        const file = path.resolve('dist/index.html')
+        if (!fs.existsSync(file)) return
+        const html = fs
+          .readFileSync(file, 'utf8')
+          .replace(/<script type="module">/g, '<script>')
+        fs.writeFileSync(file, html)
+      },
+    },
   ],
 
   build: {
     target: 'esnext',
+    assetsInlineLimit: 2_000_000,
+    modulePreload: false,
   },
   // Relative URLs so the static build works on IPFS gateways (/ipfs/<cid>/...)
   base: './',

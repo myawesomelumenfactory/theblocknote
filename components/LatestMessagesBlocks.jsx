@@ -4,6 +4,7 @@ import GlassCard from "./GlassCard";
 import { decodeOpReturn } from '../services/TheBlockNote';
 import { Activity, ChevronUp, ChevronDown } from "lucide-react";
 import { applyVoteUp, applyVoteDown } from '../services/BitcoinService';
+import immutablesData from '../data/immutables.json';
 import { SharedContext } from '../src/SharedContext';
 
 export default function LatestMessagesBlocks() {
@@ -325,21 +326,7 @@ export default function LatestMessagesBlocks() {
   }
 
   const fetchMessages = async() => {
-
-    var immutables = [];
-    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-    const res = await fetch(`${import.meta.env.BASE_URL}data/immutables.json`);
-    if (!res.ok) throw new Error('Failed to load input file');
-    const data = await res.json();
-
-    // Process each TX sequentially with delay
-    for (let i = 0; i < data.length ; i++) {
-
-      immutables.push(data[i]);
-    }
-
-    return immutables;
+    return Array.isArray(immutablesData) ? immutablesData : [];
   }
 
   useEffect(() => {

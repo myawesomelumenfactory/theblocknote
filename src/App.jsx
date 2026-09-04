@@ -22,8 +22,9 @@ function App() {
 
   const fetchAddresses = async () => {
     
-    const keyPairs = JSON.parse(localStorage.getItem('keyPairs'));
-
+    const stored = localStorage.getItem('keyPairs');
+    const parsed = stored ? JSON.parse(stored) : {};
+    const keyPairs = parsed && typeof parsed === 'object' ? parsed : {};
     localStorage.setItem('keyPairs', JSON.stringify(keyPairs));
 
     var refsData = [];
@@ -31,7 +32,8 @@ function App() {
     var refIndex = 0;
 
     const fetchAllTransactions = async () => {
-        const keyPairs = JSON.parse(localStorage.getItem('keyPairs') || '{}');
+        const storedKeys = JSON.parse(localStorage.getItem('keyPairs') || '{}');
+        const keyPairs = storedKeys && typeof storedKeys === 'object' ? storedKeys : {};
       
         const fetchPromises = Object.entries(keyPairs).map(async ([publicKey, privateKey]) => {
         const response = await fetch(`https://api.blockchain.info/haskoin-store/btc/address/${publicKey}/transactions`);

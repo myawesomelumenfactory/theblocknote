@@ -25,13 +25,6 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Stage data for the static build
-        run: |
-          mkdir -p public/data
-          cp -f data/immutables.json public/data/immutables.json
-          cp -f data/scripts.json public/data/scripts.json 2>/dev/null || true
-          cp -f data/txids.json public/data/txids.json 2>/dev/null || true
-
       - name: Build
         run: npm run build
 
@@ -58,5 +51,5 @@ jobs:
           else
             gh release create static theblocknote-static.zip \
               --title "Static assets" \
-              --notes "Latest production build of The Block Note. Unzip and open, or serve the folder with any static file server."
+              --notes "Latest production build of The Block Note. Unzip and open index.html in a browser (no local server needed). If an old service worker still intercepts the page, refresh once after it unregisters."
           fi
