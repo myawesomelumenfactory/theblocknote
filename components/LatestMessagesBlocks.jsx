@@ -346,14 +346,25 @@ export default function LatestMessagesBlocks() {
   }
 
   const fetchMessages = async() => {
-    return mergeImmutables(
-      Array.isArray(immutablesData) ? immutablesData : [],
-      readImmutablesOverlay()
-    );
+    let base = Array.isArray(immutablesData) ? immutablesData : [];
+    try {
+      const response = await fetch(`${import.meta.env.BASE_URL}data/immutables.json`);
+      if (response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data) && data.length) base = data;
+      }
+    } catch {
+      // Fall back to the bundled snapshot.
+    }
+    return mergeImmutables(base, readImmutablesOverlay());
   }
 
   useEffect(() => {
     fetchTheBlockNote();
+    const poll = window.setInterval(() => {
+      fetchTheBlockNote();
+    }, 30000);
+    return () => window.clearInterval(poll);
   }, []);
 
   useEffect(() => {

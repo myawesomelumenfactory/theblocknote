@@ -1,10 +1,13 @@
 import fs from 'node:fs/promises';
+import fsSync from 'node:fs';
 import path from 'node:path';
 import { decodeOpReturn } from './TheBlockNote.js';
 
 const PROTOCOL_RE = /^t\s+-?\d+\s+-?\d+/;
+const TOKEN_URL = 'https://login.blockstream.com/realms/blockstream-public/protocol/openid-connect/token';
+const ENTERPRISE_API = 'https://enterprise.blockstream.info/api';
 
-const EXPLORERS = [
+const PUBLIC_EXPLORERS = [
   {
     name: 'blockchain.info',
     kind: 'rawblock',
@@ -24,6 +27,71 @@ const EXPLORERS = [
   },
 ];
 
+let cachedToken = null;
+let tokenExpiresAt = 0;
+let tokenInFlight = null;
+
+function loadDotEnv() {
+  const envPath = path.resolve('.env');
+  if (!fsSync.existsSync(envPath)) return;
+  for (const line of fsSync.readFileSync(envPath, 'utf8').split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq < 1) continue;
+    const key = trimmed.slice(0, eq).trim();
+    const value = trimmed.slice(eq + 1).trim();
+    if (key && process.env[key] == null) process.env[key] = value;
+  }
+}
+
+function getExplorers() {
+  const explorers = [];
+  if (process.env.BLOCKSTREAM_CLIENT_ID && process.env.BLOCKSTREAM_CLIENT_SECRET) {
+    explorers.push({
+      name: 'blockstream-enterprise',
+      kind: 'esplora',
+      base: ENTERPRISE_API,
+    });
+  }
+  explorers.push(...PUBLIC_EXPLORERS);
+  return explorers;
+}
+
+async function getEnterpriseToken() {
+  const clientId = process.env.BLOCKSTREAM_CLIENT_ID;
+  const clientSecret = process.env.BLOCKSTREAM_CLIENT_SECRET;
+  if (!clientId || !clientSecret) return null;
+  if (cachedToken && Date.now() < tokenExpiresAt - 60_000) return cachedToken;
+  if (tokenInFlight) return tokenInFlight;
+
+  tokenInFlight = (async () => {
+    const response = await fetch(TOKEN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        grant_type: 'client_credentials',
+        scope: 'openid',
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.access_token) {
+      throw new Error(data.error_description || data.error || `Token request failed (${response.status})`);
+    }
+    cachedToken = data.access_token;
+    tokenExpiresAt = Date.now() + (Number(data.expires_in) || 300) * 1000;
+    return cachedToken;
+  })();
+
+  try {
+    return await tokenInFlight;
+  } finally {
+    tokenInFlight = null;
+  }
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -37,12 +105,15 @@ async function fetchText(url, { retries = 6 } = {}) {
 
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
-      const response = await fetch(url, {
-        headers: {
-          Accept: 'application/json,text/plain;q=0.9,*/*;q=0.8',
-          'User-Agent': 'TheBlockNote/1.0 (immutables indexer)',
-        },
-      });
+      const headers = {
+        Accept: 'application/json,text/plain;q=0.9,*/*;q=0.8',
+        'User-Agent': 'TheBlockNote/1.0 (immutables indexer)',
+      };
+      if (url.startsWith(ENTERPRISE_API)) {
+        const token = await getEnterpriseToken();
+        if (token) headers.Authorization = `Bearer ${token}`;
+      }
+      const response = await fetch(url, { headers });
 
       if (response.status === 429 || response.status >= 500) {
         const wait = Math.min(30_000, 750 * 2 ** attempt);
@@ -161,7 +232,7 @@ async function fetchBlockViaEsplora(explorer, height, options) {
 async function fetchBlock(height, options) {
   let lastError;
 
-  for (const explorer of EXPLORERS) {
+  for (const explorer of getExplorers()) {
     try {
       if (explorer.kind === 'rawblock') {
         return await fetchBlockViaRaw(explorer, height, options);
@@ -177,7 +248,7 @@ async function fetchBlock(height, options) {
 }
 
 async function fetchTipHeight() {
-  for (const explorer of EXPLORERS) {
+  for (const explorer of getExplorers()) {
     try {
       if (explorer.kind === 'rawblock') {
         return Number.parseInt(await fetchText(explorer.tip), 10);
@@ -269,6 +340,7 @@ Examples:
 }
 
 export async function runIndexer(options) {
+  loadDotEnv();
   const canonicalOut = path.resolve('data/immutables.json');
   const statePath = path.join(path.dirname(options.out), '.immutables-state.json');
   const publicCopy =
