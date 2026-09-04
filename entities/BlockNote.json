@@ -1,0 +1,36 @@
+{
+    "name": "BlockNote",
+    "type": "object",
+    "properties": {
+      "text_content": {
+        "type": "string",
+        "maxLength": 80,
+        "description": "The text to embed in the Bitcoin blockchain"
+      },
+      "transaction_id": {
+        "type": "string",
+        "description": "Simulated Bitcoin transaction ID"
+      },
+      "block_height": {
+        "type": "number",
+        "description": "Simulated block height"
+      },
+      "confirmation_status": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "confirmed",
+          "failed"
+        ],
+        "default": "pending",
+        "description": "Status of the blockchain embedding"
+      },
+      "fee_amount": {
+        "type": "number",
+        "description": "Transaction fee in satoshis"
+      }
+    },
+    "required": [
+      "text_content"
+    ]
+  }

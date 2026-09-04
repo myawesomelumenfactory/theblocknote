@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Build
+dist/
+theblocknote/
+
+# Env and secrets
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+*.log
+.vscode/
+.idea/
+
+# Vite
+.vite/
+
+# Indexer checkpoint and bulky chain dumps
+data/.immutables-state.json
+data/from_*.json
+data/blocks_*.json
+data/txs*.json

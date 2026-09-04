@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+body {
+    margin: 0;
+    height: 100vh;
+    background-color: rgb(53, 146, 240);
+    overflow: hidden;
+    position: relative;
+    font-family: sans-serif;
+}
+
+html, body, #root {
+    height: 100%;
+    margin: 0;
+  }
