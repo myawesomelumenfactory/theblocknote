@@ -8,7 +8,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "index:immutables": "node scripts/fetch-immutables.js"
+    "index:immutables": "node scripts/fetch-immutables.js",
+    "immutables:service": "node scripts/immutables-service.js"
   },
   "dependencies": {
     "@esbuild-plugins/node-globals-polyfill": "^0.2.3",

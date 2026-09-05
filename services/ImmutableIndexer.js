@@ -1,8 +1,11 @@
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
 import path from 'node:path';
+import bitcoinjs from 'bitcoinjs-lib';
 import { decodeOpReturn } from './TheBlockNote.js';
 import { isProtocolMessage, recordsFromEsploraTxs } from './immutableProtocol.js';
+
+const { Block } = bitcoinjs;
 
 const TOKEN_URL = 'https://login.blockstream.com/realms/blockstream-public/protocol/openid-connect/token';
 const ENTERPRISE_API = 'https://enterprise.blockstream.info/api';
@@ -45,14 +48,33 @@ function loadDotEnv() {
   }
 }
 
-function getExplorers() {
+function getExplorers(options = {}) {
   const explorers = [];
-  if (process.env.BLOCKSTREAM_CLIENT_ID && process.env.BLOCKSTREAM_CLIENT_SECRET) {
+  if (
+    !skipEnterprise &&
+    process.env.BLOCKSTREAM_CLIENT_ID &&
+    process.env.BLOCKSTREAM_CLIENT_SECRET
+  ) {
     explorers.push({
       name: 'blockstream-enterprise',
       kind: 'esplora',
       base: ENTERPRISE_API,
     });
+  }
+  if (options.blockstreamOnly) {
+    if (!skipBlockstreamPublic) {
+      explorers.push({
+        name: 'blockstream',
+        kind: 'esplora',
+        base: 'https://blockstream.info/api',
+      });
+    }
+    explorers.push({
+      name: 'mempool.space',
+      kind: 'esplora',
+      base: 'https://mempool.space/api',
+    });
+    return explorers;
   }
   explorers.push(...PUBLIC_EXPLORERS);
   return explorers;
@@ -96,6 +118,28 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function isRetryableHttpStatus(status) {
+  return status === 429 || status >= 500;
+}
+
+let skipEnterprise = false;
+let skipBlockstreamPublic = false;
+
+function noteExplorerFailure(url, status) {
+  if (url.startsWith(ENTERPRISE_API) && (status === 401 || status === 402 || status === 403)) {
+    if (!skipEnterprise) {
+      console.warn('  Blockstream enterprise unavailable; using public Blockstream API');
+    }
+    skipEnterprise = true;
+  }
+  if (url.includes('://blockstream.info/') && status === 429) {
+    if (!skipBlockstreamPublic) {
+      console.warn('  Public Blockstream is rate-limited; using mempool.space');
+    }
+    skipBlockstreamPublic = true;
+  }
+}
+
 async function fetchText(url, { retries = 6 } = {}) {
   let lastError;
 
@@ -111,7 +155,14 @@ async function fetchText(url, { retries = 6 } = {}) {
       }
       const response = await fetch(url, { headers });
 
-      if (response.status === 429 || response.status >= 500) {
+      if (response.status === 429 && url.includes('://blockstream.info/')) {
+        noteExplorerFailure(url, response.status);
+        const error = new Error(`HTTP ${response.status} for ${url}`);
+        error.status = response.status;
+        throw error;
+      }
+
+      if (isRetryableHttpStatus(response.status)) {
         const wait = Math.min(30_000, 750 * 2 ** attempt);
         console.warn(`  ${response.status} from ${url} — retry in ${wait}ms`);
         await sleep(wait);
@@ -119,12 +170,75 @@ async function fetchText(url, { retries = 6 } = {}) {
       }
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status} for ${url}`);
+        noteExplorerFailure(url, response.status);
+        const error = new Error(`HTTP ${response.status} for ${url}`);
+        error.status = response.status;
+        throw error;
       }
 
       return await response.text();
     } catch (error) {
       lastError = error;
+      if (error.status === 429 && skipBlockstreamPublic) {
+        throw error;
+      }
+      if (error.status && !isRetryableHttpStatus(error.status)) {
+        throw error;
+      }
+      const wait = Math.min(30_000, 750 * 2 ** attempt);
+      console.warn(`  ${error.message} — retry in ${wait}ms`);
+      await sleep(wait);
+    }
+  }
+
+  throw lastError || new Error(`Failed to fetch ${url}`);
+}
+
+async function fetchBuffer(url, { retries = 6 } = {}) {
+  let lastError;
+
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const headers = {
+        Accept: 'application/octet-stream,application/json;q=0.8,*/*;q=0.5',
+        'User-Agent': 'TheBlockNote/1.0 (immutables indexer)',
+      };
+      if (url.startsWith(ENTERPRISE_API)) {
+        const token = await getEnterpriseToken();
+        if (token) headers.Authorization = `Bearer ${token}`;
+      }
+      const response = await fetch(url, { headers });
+
+      if (response.status === 429 && url.includes('://blockstream.info/')) {
+        noteExplorerFailure(url, response.status);
+        const error = new Error(`HTTP ${response.status} for ${url}`);
+        error.status = response.status;
+        throw error;
+      }
+
+      if (isRetryableHttpStatus(response.status)) {
+        const wait = Math.min(30_000, 750 * 2 ** attempt);
+        console.warn(`  ${response.status} from ${url} — retry in ${wait}ms`);
+        await sleep(wait);
+        continue;
+      }
+
+      if (!response.ok) {
+        noteExplorerFailure(url, response.status);
+        const error = new Error(`HTTP ${response.status} for ${url}`);
+        error.status = response.status;
+        throw error;
+      }
+
+      return Buffer.from(await response.arrayBuffer());
+    } catch (error) {
+      lastError = error;
+      if (error.status === 429 && skipBlockstreamPublic) {
+        throw error;
+      }
+      if (error.status && !isRetryableHttpStatus(error.status)) {
+        throw error;
+      }
       const wait = Math.min(30_000, 750 * 2 ** attempt);
       console.warn(`  ${error.message} — retry in ${wait}ms`);
       await sleep(wait);
@@ -171,6 +285,29 @@ function extractFromEsploraTxs(txs, blockTime, { protocolOnly }) {
   return recordsFromEsploraTxs(txs, blockTime, protocolOnly);
 }
 
+function extractFromBitcoinBlock(block, { protocolOnly }) {
+  const records = [];
+  const time = block.timestamp;
+
+  for (const tx of block.transactions || []) {
+    const txid = tx.getId();
+    (tx.outs || []).forEach((out, index) => {
+      const script = out.script;
+      if (!script || script[0] !== 0x6a) return;
+      const value = decodeOpReturn(Buffer.from(script).toString('hex'));
+      if (!value) return;
+      if (protocolOnly && !isProtocolMessage(value)) return;
+      records.push({
+        index: `${txid}_${index}`,
+        time,
+        value,
+      });
+    });
+  }
+
+  return records;
+}
+
 async function fetchBlockViaRaw(explorer, height, options) {
   const payload = await fetchJson(explorer.blockHeight(height));
   const block = Array.isArray(payload.blocks) ? payload.blocks[0] : payload;
@@ -200,15 +337,30 @@ async function fetchBlockViaEsplora(explorer, height, options) {
   return records;
 }
 
+async function fetchBlockViaEsploraRaw(explorer, height, options) {
+  const hash = (await fetchText(`${explorer.base}/block-height/${height}`)).trim();
+  const raw = await fetchBuffer(`${explorer.base}/block/${hash}/raw`);
+  const block = Block.fromBuffer(raw);
+  if (!block.transactions?.length) {
+    throw new Error(`Empty raw block at ${height}`);
+  }
+  return extractFromBitcoinBlock(block, options);
+}
+
 async function fetchBlock(height, options) {
   let lastError;
 
-  for (const explorer of getExplorers()) {
+  for (const explorer of getExplorers(options)) {
     try {
       if (explorer.kind === 'rawblock') {
         return await fetchBlockViaRaw(explorer, height, options);
       }
-      return await fetchBlockViaEsplora(explorer, height, options);
+      try {
+        return await fetchBlockViaEsploraRaw(explorer, height, options);
+      } catch (rawError) {
+        console.warn(`  ${explorer.name} raw block failed at ${height}: ${rawError.message}`);
+        return await fetchBlockViaEsplora(explorer, height, options);
+      }
     } catch (error) {
       lastError = error;
       console.warn(`  ${explorer.name} failed at ${height}: ${error.message}`);
@@ -218,8 +370,8 @@ async function fetchBlock(height, options) {
   throw lastError;
 }
 
-async function fetchTipHeight() {
-  for (const explorer of getExplorers()) {
+async function fetchTipHeight(options = {}) {
+  for (const explorer of getExplorers(options)) {
     try {
       if (explorer.kind === 'rawblock') {
         return Number.parseInt(await fetchText(explorer.tip), 10);
@@ -257,6 +409,7 @@ export function parseArgs(argv = process.argv.slice(2)) {
     overlap: 0,
     maxBlocks: null,
     untilTip: false,
+    blockstreamOnly: false,
     out: path.resolve('data/immutables.json'),
   };
 
@@ -291,6 +444,8 @@ export function parseArgs(argv = process.argv.slice(2)) {
       i++;
     } else if (arg === '--until-tip') {
       options.untilTip = true;
+    } else if (arg === '--blockstream') {
+      options.blockstreamOnly = true;
     } else if (arg === '--help' || arg === '-h') {
       options.help = true;
     }
@@ -316,12 +471,14 @@ Options:
   --overlap <n>       Re-scan the last n blocks before continuing to tip (default: 0)
   --max-blocks <n>    Stop after n blocks this pass (useful for CI)
   --until-tip         Keep scanning passes until chain tip or INDEX_DEADLINE_MS
+  --blockstream       Use only the Blockstream API (enterprise if configured)
 
 Examples:
   npm run index:immutables
   npm run index:immutables -- --from 906867 --to 910933
   npm run index:immutables -- --overlap 8
   npm run index:immutables -- --overlap 8 --max-blocks 800 --until-tip
+  npm run index:immutables -- --blockstream --until-tip
   npm run index:immutables -- --from 906867 --all-op-return
 `;
 }
@@ -345,9 +502,13 @@ export async function runIndexer(options) {
   let lastHeight = null;
 
   if (options.resume) {
-    const state =
-      (await readJsonIfExists(statePath, null)) ||
-      (await readJsonIfExists(legacyStatePath, null));
+    const stateCandidates = [
+      await readJsonIfExists(statePath, null),
+      await readJsonIfExists(legacyStatePath, null),
+    ].filter((row) => row?.lastHeight != null);
+    const state = stateCandidates.length
+      ? stateCandidates.sort((a, b) => b.lastHeight - a.lastHeight)[0]
+      : null;
     const existing = await readJsonIfExists(options.out, []);
     if (Array.isArray(existing) && existing.length) {
       records = existing;
@@ -368,7 +529,7 @@ export async function runIndexer(options) {
     }
   }
 
-  const tip = await fetchTipHeight();
+  const tip = await fetchTipHeight(options);
   let to = options.to ?? tip;
   if (options.maxBlocks) {
     to = Math.min(to, from + options.maxBlocks - 1);
@@ -507,7 +668,9 @@ export async function runIndexerUntilTip(options) {
     }
 
     result = await runIndexer(options);
-    if (result.stopped || result.caughtUp) {
+    const reachedRequestedTo =
+      options.to != null && result.lastHeight != null && result.lastHeight >= options.to;
+    if (result.stopped || result.caughtUp || reachedRequestedTo) {
       if (result.caughtUp) {
         console.log(`Caught up to tip ${result.tip} (${result.count} messages)`);
       }
