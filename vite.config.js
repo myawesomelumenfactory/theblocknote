@@ -8,6 +8,7 @@ import { viteSingleFile } from 'vite-plugin-singlefile'
 import wasm from 'vite-plugin-wasm';
 import { blockstreamEnterpriseProxy } from './plugins/blockstreamEnterpriseProxy.js'
 import { immutablesAppend } from './plugins/immutablesAppend.js'
+import { livePresence } from './plugins/livePresence.js'
 
 function serveDataDir() {
   return {
@@ -66,6 +67,7 @@ export default defineConfig(({ mode }) => {
       wasm(),
       immutablesModule(),
       immutablesAppend(),
+      livePresence(),
       serveDataDir(),
       blockstreamEnterpriseProxy(env),
       nodePolyfills({

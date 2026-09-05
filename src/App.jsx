@@ -5,6 +5,8 @@ import PowerPage from '../pages/PowerPage';
 import MainPage from '../pages/MainPage';
 import ReadPage from '../pages/ReadPage';
 import GeneratePage from '../pages/GeneratePage';
+import StatusPage from '../pages/StatusPage';
+import LiveVisitBeacon from '../components/LiveVisitBeacon';
 import { SharedContext } from '../src/SharedContext';
 import { explorerJson, explorerText, explorerTipHeight } from '../services/BlockstreamExplorer';
 import { getHighestFundedUnit } from '../services/BitcoinService';
@@ -284,9 +286,14 @@ function App() {
   }, [refs]);
 
 
+  const publishLiveCount = useCallback((count) => {
+    window.dispatchEvent(new CustomEvent('theblocknote:live-visits', { detail: count }))
+  }, [])
+
   return (
     <>
       <SharedContext.Provider value={{ refs, setRefs, addressFunds, fundsProgress, currentIndex, setCurrentIndex, refreshRefs: fetchAddresses, ensureUtxoHex }}>
+        <LiveVisitBeacon onCount={publishLiveCount} />
         <div>
           <div className="h-screen bg-[radial-gradient(circle_at_center,_#3a5ca7_10%,_#1e2a4a_100%,_#0c0f1a_120%)] text-white relative overflow-x-hidden overflow-y-auto pb-50">
               <Routes>
@@ -294,6 +301,7 @@ function App() {
                 <Route path="/power" element={<PowerPage />} />
                 <Route path="/read" element={<ReadPage />} />
                 <Route path="/generate" element={<GeneratePage />} />
+                <Route path="/status" element={<StatusPage />} />
 
               </Routes>
           </div>

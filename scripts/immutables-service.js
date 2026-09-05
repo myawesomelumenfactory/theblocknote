@@ -2,7 +2,7 @@ import http from 'node:http'
 import fs from 'node:fs'
 import path from 'node:path'
 import { parseArgs, runIndexer, runIndexerUntilTip } from '../services/ImmutableIndexer.js'
-import { publishImmutables } from '../services/immutables/publishImmutables.js'
+import { handleLivePresence } from '../services/livePresence.js'
 
 const PROTOCOL_START = 906867
 const DEFAULT_PORT = 8788
@@ -77,28 +77,34 @@ async function indexPass(options) {
 
 function startHttpServer(port, host) {
   const server = http.createServer((req, res) => {
-    const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`)
+    const run = async () => {
+      if (await handleLivePresence(req, res)) return
+      const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`)
 
-    if (req.method === 'GET' && url.pathname === '/health') {
-      json(res, 200, { ok: true, running: status.running })
-      return
-    }
-    if (req.method === 'GET' && url.pathname === '/status') {
-      json(res, 200, status)
-      return
-    }
-    if (req.method === 'GET' && url.pathname === '/data/immutables.json') {
-      sendFile(res, path.resolve('data/immutables.json'), 'application/json; charset=utf-8')
-      return
-    }
-    if (req.method === 'GET' && url.pathname === '/data/immutables-state.json') {
-      sendFile(res, path.resolve('data/immutables-state.json'), 'application/json; charset=utf-8')
-      return
-    }
+      if (req.method === 'GET' && url.pathname === '/health') {
+        json(res, 200, { ok: true, running: status.running })
+        return
+      }
+      if (req.method === 'GET' && url.pathname === '/status') {
+        json(res, 200, status)
+        return
+      }
+      if (req.method === 'GET' && url.pathname === '/data/immutables.json') {
+        sendFile(res, path.resolve('data/immutables.json'), 'application/json; charset=utf-8')
+        return
+      }
+      if (req.method === 'GET' && url.pathname === '/data/immutables-state.json') {
+        sendFile(res, path.resolve('data/immutables-state.json'), 'application/json; charset=utf-8')
+        return
+      }
 
-    json(res, 404, {
-      error: 'Not found',
-      routes: ['/health', '/status', '/data/immutables.json', '/data/immutables-state.json'],
+      json(res, 404, {
+        error: 'Not found',
+        routes: ['/health', '/status', '/data/immutables.json', '/data/immutables-state.json', '/__presence'],
+      })
+    }
+    run().catch((error) => {
+      json(res, 500, { error: error.message })
     })
   })
 
