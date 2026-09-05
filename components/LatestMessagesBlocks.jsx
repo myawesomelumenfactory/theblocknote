@@ -2,7 +2,7 @@ import React, { useEffect, useState, useContext } from 'react';
 import { motion } from "framer-motion";
 import GlassCard from "./GlassCard";
 import { decodeOpReturn } from '../services/TheBlockNote';
-import { Activity, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, List } from "lucide-react";
+import { Activity, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, List, Loader2 } from "lucide-react";
 import { applyVoteUp, applyVoteDown, getHighestFundedUnit } from '../services/BitcoinService';
 import { appendImmutable, loadImmutableRecords, readImmutablesOverlay } from '../services/ImmutablesStore';
 import immutablesData from 'virtual:immutables';
@@ -21,6 +21,7 @@ export default function LatestMessagesBlocks() {
   const [voteNotice, setVoteNotice] = useState(null);
   const [votingIndex, setVotingIndex] = useState(null);
   const [openVoteLists, setOpenVoteLists] = useState(() => new Set());
+  const [loading, setLoading] = useState(true);
   const { refs, ensureUtxoHex } = useContext(SharedContext);
   const hasFundedUnit = Boolean(getHighestFundedUnit(Array.isArray(refs) ? refs : [], 450));
 
@@ -382,6 +383,8 @@ export default function LatestMessagesBlocks() {
     setVotedMessages(rememberedVotes);
     } catch (error) {
       console.error('Failed to load immutables.json', error);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -414,9 +417,9 @@ export default function LatestMessagesBlocks() {
         initial={{ opacity: 0, y: 20, scale: 0.95 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ 
-        delay: 2,
-        duration: 3.2,
-        ease: [0.4, 0, 0.2, 1] // Custom cubic-bezier for smooth, natural motion
+        delay: 0.15,
+        duration: 0.6,
+        ease: [0.4, 0, 0.2, 1]
         }}
         className="w-full"
     >
@@ -449,12 +452,26 @@ export default function LatestMessagesBlocks() {
           <span className="font-bold">Error:</span> {voteNotice.text}
         </div>
       )}
-      {!hasFundedUnit && (
+      {!hasFundedUnit && !loading && (
         <p className="text-white/50 text-sm mb-4">
           Voting needs a funded unit from Spark.
         </p>
       )}
 
+      {loading ? (
+        <div
+          className="flex flex-col items-center justify-center py-16 min-h-[280px] gap-3"
+          role="status"
+          aria-live="polite"
+        >
+          <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+          <span className="text-white/60 text-sm">Loading messages…</span>
+        </div>
+      ) : (
+      <div>
+      {pagedMessages.length === 0 ? (
+        <p className="text-white/50 text-sm py-8 text-center">No messages yet.</p>
+      ) : null}
       <ul>
         {pagedMessages.map((t, index) => (
           <motion.div 
@@ -608,6 +625,8 @@ export default function LatestMessagesBlocks() {
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
+      )}
+      </div>
       )}
 
     </GlassCard> }

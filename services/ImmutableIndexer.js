@@ -69,14 +69,29 @@ function getExplorers(options = {}) {
         base: 'https://blockstream.info/api',
       });
     }
+    if (!skipMempool) {
+      explorers.push({
+        name: 'mempool.space',
+        kind: 'esplora',
+        base: 'https://mempool.space/api',
+      });
+    }
     explorers.push({
-      name: 'mempool.space',
-      kind: 'esplora',
-      base: 'https://mempool.space/api',
+      name: 'blockchain.info',
+      kind: 'rawblock',
+      blockHeight: (height) =>
+        `https://blockchain.info/block-height/${height}?format=json`,
+      tip: 'https://blockchain.info/q/getblockcount',
     });
     return explorers;
   }
-  explorers.push(...PUBLIC_EXPLORERS);
+  explorers.push(
+    ...PUBLIC_EXPLORERS.filter((row) => {
+      if (skipMempool && row.name === 'mempool.space') return false;
+      if (skipBlockstreamPublic && row.name === 'blockstream') return false;
+      return true;
+    })
+  );
   return explorers;
 }
 
@@ -124,6 +139,22 @@ function isRetryableHttpStatus(status) {
 
 let skipEnterprise = false;
 let skipBlockstreamPublic = false;
+let skipMempool = false;
+
+const FETCH_TIMEOUT_MS = 15_000;
+
+function isMempoolUnreachable(url, error) {
+  if (!String(url).includes('://mempool.space/')) return false;
+  const code = error?.cause?.code || '';
+  return (
+    error?.name === 'TimeoutError' ||
+    error?.name === 'AbortError' ||
+    code === 'UND_ERR_CONNECT_TIMEOUT' ||
+    code === 'UND_ERR_CONNECT' ||
+    error?.message === 'fetch failed' ||
+    /aborted|timeout/i.test(String(error?.message || ''))
+  );
+}
 
 function noteExplorerFailure(url, status) {
   if (url.startsWith(ENTERPRISE_API) && (status === 401 || status === 402 || status === 403)) {
@@ -134,7 +165,7 @@ function noteExplorerFailure(url, status) {
   }
   if (url.includes('://blockstream.info/') && status === 429) {
     if (!skipBlockstreamPublic) {
-      console.warn('  Public Blockstream is rate-limited; using mempool.space');
+      console.warn('  Public Blockstream is rate-limited; using the next explorer');
     }
     skipBlockstreamPublic = true;
   }
@@ -153,7 +184,10 @@ async function fetchText(url, { retries = 6 } = {}) {
         const token = await getEnterpriseToken();
         if (token) headers.Authorization = `Bearer ${token}`;
       }
-      const response = await fetch(url, { headers });
+      const response = await fetch(url, {
+        headers,
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
 
       if (response.status === 429 && url.includes('://blockstream.info/')) {
         noteExplorerFailure(url, response.status);
@@ -179,6 +213,13 @@ async function fetchText(url, { retries = 6 } = {}) {
       return await response.text();
     } catch (error) {
       lastError = error;
+      if (isMempoolUnreachable(url, error)) {
+        if (!skipMempool) {
+          console.warn('  mempool.space unreachable; using blockchain.info fallback');
+        }
+        skipMempool = true;
+        throw error;
+      }
       if (error.status === 429 && skipBlockstreamPublic) {
         throw error;
       }
@@ -207,7 +248,10 @@ async function fetchBuffer(url, { retries = 6 } = {}) {
         const token = await getEnterpriseToken();
         if (token) headers.Authorization = `Bearer ${token}`;
       }
-      const response = await fetch(url, { headers });
+      const response = await fetch(url, {
+        headers,
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
 
       if (response.status === 429 && url.includes('://blockstream.info/')) {
         noteExplorerFailure(url, response.status);
@@ -233,6 +277,13 @@ async function fetchBuffer(url, { retries = 6 } = {}) {
       return Buffer.from(await response.arrayBuffer());
     } catch (error) {
       lastError = error;
+      if (isMempoolUnreachable(url, error)) {
+        if (!skipMempool) {
+          console.warn('  mempool.space unreachable; using blockchain.info fallback');
+        }
+        skipMempool = true;
+        throw error;
+      }
       if (error.status === 429 && skipBlockstreamPublic) {
         throw error;
       }

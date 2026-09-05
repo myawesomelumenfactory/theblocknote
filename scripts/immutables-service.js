@@ -2,6 +2,7 @@ import http from 'node:http'
 import fs from 'node:fs'
 import path from 'node:path'
 import { parseArgs, runIndexer, runIndexerUntilTip } from '../services/ImmutableIndexer.js'
+import { publishImmutables } from '../services/immutables/publishImmutables.js'
 import { handleLivePresence } from '../services/livePresence.js'
 
 const PROTOCOL_START = 906867
@@ -49,6 +50,31 @@ const status = {
   updatedAt: null,
   error: null,
 }
+
+function hydrateStatusFromDisk() {
+  const files = [
+    path.resolve('data/immutables-state.json'),
+    path.resolve('data/.immutables-state.json'),
+    path.resolve('public/data/immutables-state.json'),
+  ]
+  let best = null
+  for (const file of files) {
+    try {
+      const row = JSON.parse(fs.readFileSync(file, 'utf8'))
+      if (row?.lastHeight == null) continue
+      if (!best || row.lastHeight > best.lastHeight) best = row
+    } catch {
+      // Missing or unreadable checkpoint; try the next copy.
+    }
+  }
+  if (!best) return
+  status.lastHeight = best.lastHeight
+  status.tip = best.tip ?? status.tip
+  status.count = best.count ?? status.count
+  status.updatedAt = best.updatedAt ?? status.updatedAt
+}
+
+hydrateStatusFromDisk()
 
 async function indexPass(options) {
   const result = options.to != null

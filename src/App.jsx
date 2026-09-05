@@ -8,7 +8,7 @@ import GeneratePage from '../pages/GeneratePage';
 import StatusPage from '../pages/StatusPage';
 import LiveVisitBeacon from '../components/LiveVisitBeacon';
 import { SharedContext } from '../src/SharedContext';
-import { explorerJson, explorerText, explorerTipHeight } from '../services/BlockstreamExplorer';
+import { fetchBalances, fetchTipHeight, fetchTxHex, fetchUnspents } from '../services/HaskoinStore';
 import { getHighestFundedUnit } from '../services/BitcoinService';
 
 const CONFIRMED_AFTER = 6;
@@ -111,32 +111,19 @@ function App() {
         return;
       }
 
-      const tipHeight = await explorerTipHeight();
+      const tipHeight = await fetchTipHeight();
       let checked = 0;
 
-      const summarizeFunds = (address, info, utxos = []) => {
-        let received = 0;
-        let available = 0;
-        let unconfirmed = 0;
-        if (info) {
-          const confirmedReceived = info.chain_stats?.funded_txo_sum || 0;
-          const mempoolReceived = info.mempool_stats?.funded_txo_sum || 0;
-          const spent =
-            (info.chain_stats?.spent_txo_sum || 0) +
-            (info.mempool_stats?.spent_txo_sum || 0);
-          received = confirmedReceived + mempoolReceived;
-          unconfirmed = mempoolReceived;
-          available = received - spent;
-        }
+      const summarizeUtxos = (previous = {}, utxos = []) => {
         const utxoSum = utxos.reduce((sum, utxo) => sum + (utxo.value || 0), 0);
-        if (utxoSum > received) received = utxoSum;
-        if (utxoSum > available) available = utxoSum;
         const utxoUnconfirmed = utxos
           .filter((utxo) => !utxo.status?.confirmed)
           .reduce((sum, utxo) => sum + (utxo.value || 0), 0);
-        if (utxoUnconfirmed > unconfirmed) unconfirmed = utxoUnconfirmed;
         const confirmationCounts = utxos.map((utxo) => utxoConfirmations(utxo, tipHeight));
-        const confirmations = confirmationCounts.length ? Math.min(...confirmationCounts) : 0;
+        const confirmations = confirmationCounts.length ? Math.min(...confirmationCounts) : (previous.confirmations || 0);
+        const received = Math.max(previous.received || 0, utxoSum);
+        const available = Math.max(previous.available || 0, utxoSum);
+        const unconfirmed = Math.max(previous.unconfirmed || 0, utxoUnconfirmed);
         return {
           received,
           available,
@@ -162,25 +149,40 @@ function App() {
       const fundedCount = () =>
         Object.keys(keyPairs).filter((addr) => (fundsByAddress[addr]?.received || 0) > 0).length;
 
-      await runPool(entries, 8, async ([address]) => {
+      const KEY_BATCH = 40;
+      for (let i = 0; i < entries.length; i += KEY_BATCH) {
+        const batch = entries.slice(i, i + KEY_BATCH);
         try {
-          const info = await explorerJson(`/address/${address}`);
-          fundsByAddress[address] = summarizeFunds(address, info);
+          const balances = await fetchBalances(batch.map(([address]) => address));
+          for (const [address] of batch) {
+            fundsByAddress[address] = balances[address] || fundsByAddress[address] || summarizeUtxos();
+            checked += 1;
+            if (!watch) {
+              setFundsProgress({
+                total: entries.length,
+                checked,
+                funded: fundedCount(),
+                phase: 'keys',
+              });
+            }
+          }
+          publishFunds(keyPairs, fundsByAddress);
         } catch (error) {
-          console.warn('Failed to load address info for', address, error);
-          fundsByAddress[address] = fundsByAddress[address] || summarizeFunds(address, null);
+          console.warn('Failed to load address balances', error);
+          for (const [address] of batch) {
+            fundsByAddress[address] = fundsByAddress[address] || summarizeUtxos();
+            checked += 1;
+          }
+          if (!watch) {
+            setFundsProgress({
+              total: entries.length,
+              checked,
+              funded: fundedCount(),
+              phase: 'keys',
+            });
+          }
         }
-        checked += 1;
-        publishFunds(keyPairs, fundsByAddress);
-        if (!watch) {
-          setFundsProgress({
-            total: entries.length,
-            checked,
-            funded: fundedCount(),
-            phase: 'keys',
-          });
-        }
-      });
+      }
 
       const fundedEntries = entries.filter(([address]) => (fundsByAddress[address]?.received || 0) > 0);
       if (!watch) {
@@ -194,50 +196,55 @@ function App() {
 
       if (fundedEntries.length > 0) {
         let unitsLoaded = 0;
-        await runPool(fundedEntries, 4, async ([address, privateKey]) => {
+        const UNIT_BATCH = 20;
+        for (let i = 0; i < fundedEntries.length; i += UNIT_BATCH) {
+          const batch = fundedEntries.slice(i, i + UNIT_BATCH);
           try {
-            const utxos = (await explorerJson(`/address/${address}/utxo`)) || [];
-            if (!Array.isArray(utxos)) return;
-            const previous = fundsByAddress[address] || {};
-            const fromUtxos = summarizeFunds(address, null, utxos);
-            fundsByAddress[address] = {
-              received: Math.max(previous.received || 0, fromUtxos.received),
-              available: Math.max(previous.available || 0, fromUtxos.available),
-              unconfirmed: Math.max(previous.unconfirmed || 0, fromUtxos.unconfirmed),
-              confirmations: utxos.length ? fromUtxos.confirmations : (previous.confirmations || 0),
-              pending: fromUtxos.pending || previous.pending,
-            };
-            const existingHex = new Map(
-              (refsByAddress[address] || [])
-                .filter((row) => row.tx_raw_hex)
-                .map((row) => [`${row.tx_hash}:${row.tx_output}`, row.tx_raw_hex])
-            );
-            refsByAddress[address] = utxos.map((utxo) => ({
-              tx_hash: utxo.txid,
-              tx_raw_hex: existingHex.get(`${utxo.txid}:${utxo.vout}`) || '',
-              public_key: address,
-              private_key: privateKey,
-              tx_output: utxo.vout,
-              value: utxo.value,
-              confirmed: Boolean(utxo.status?.confirmed),
-              confirmations: utxoConfirmations(utxo, tipHeight),
-              blockHeight: utxo.status?.block_height || null,
-            }));
+            const utxosByAddress = await fetchUnspents(batch.map(([address]) => address), tipHeight);
+            for (const [address, privateKey] of batch) {
+              const utxos = utxosByAddress[address] || [];
+              fundsByAddress[address] = summarizeUtxos(fundsByAddress[address], utxos);
+              const existingHex = new Map(
+                (refsByAddress[address] || [])
+                  .filter((row) => row.tx_raw_hex)
+                  .map((row) => [`${row.tx_hash}:${row.tx_output}`, row.tx_raw_hex])
+              );
+              refsByAddress[address] = utxos.map((utxo) => ({
+                tx_hash: utxo.txid,
+                tx_raw_hex: existingHex.get(`${utxo.txid}:${utxo.vout}`) || '',
+                public_key: address,
+                private_key: privateKey,
+                tx_output: utxo.vout,
+                value: utxo.value,
+                confirmed: Boolean(utxo.status?.confirmed),
+                confirmations: utxoConfirmations(utxo, tipHeight),
+                blockHeight: utxo.status?.block_height || null,
+              }));
+              unitsLoaded += 1;
+              if (!watch) {
+                setFundsProgress({
+                  total: fundedEntries.length,
+                  checked: unitsLoaded,
+                  funded: fundedCount(),
+                  phase: 'units',
+                });
+              }
+            }
             publishFunds(keyPairs, fundsByAddress);
             publishRefs(refsByAddress);
           } catch (error) {
-            console.warn('Failed to load UTXOs for', address, error);
+            console.warn('Failed to load funded units', error);
+            unitsLoaded += batch.length;
+            if (!watch) {
+              setFundsProgress({
+                total: fundedEntries.length,
+                checked: Math.min(unitsLoaded, fundedEntries.length),
+                funded: fundedCount(),
+                phase: 'units',
+              });
+            }
           }
-          unitsLoaded += 1;
-          if (!watch) {
-            setFundsProgress({
-              total: fundedEntries.length,
-              checked: unitsLoaded,
-              funded: fundedCount(),
-              phase: 'units',
-            });
-          }
-        });
+        }
       }
 
       if (!watch) {
@@ -249,7 +256,7 @@ function App() {
         .filter((row) => row.tx_hash && !row.tx_raw_hex);
       if (missingHex.length > 0) {
         void runPool(missingHex, 3, async (row) => {
-          const hex = await explorerText(`/tx/${row.tx_hash}/hex`);
+          const hex = await fetchTxHex(row.tx_hash);
           if (!hex) return;
           row.tx_raw_hex = hex;
           publishRefs(refsByAddress);
@@ -269,7 +276,7 @@ function App() {
     const current = refsRef.current[index];
     if (!current) return null;
     if (current.tx_raw_hex) return current;
-    const hex = await explorerText(`/tx/${current.tx_hash}/hex`);
+    const hex = await fetchTxHex(current.tx_hash);
     if (!hex) return current;
     const updated = { ...current, tx_raw_hex: hex };
     setRefs((prev) => prev.map((row, rowIndex) => (rowIndex === index ? updated : row)));
