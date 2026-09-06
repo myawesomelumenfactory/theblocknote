@@ -1,14 +1,20 @@
-import React, { useEffect, useState, useContext } from 'react';
+import React, { useEffect, useMemo, useState, useContext } from 'react';
 import { motion } from "framer-motion";
 import GlassCard from "./GlassCard";
 import { decodeOpReturn } from '../services/TheBlockNote';
-import { Activity, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, List, Loader2 } from "lucide-react";
+import { Activity, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Clock, List, Loader2 } from "lucide-react";
 import { applyVoteUp, applyVoteDown, getHighestFundedUnit } from '../services/BitcoinService';
-import { appendImmutable, loadImmutableRecords, readImmutablesOverlay } from '../services/ImmutablesStore';
+import { appendImmutable, loadImmutableRecords } from '../services/ImmutablesStore';
 import immutablesData from 'virtual:immutables';
 import { SharedContext } from '../src/SharedContext';
 
 const PAGE_SIZE = 5;
+
+const SORT_MODES = [
+  { id: 'latest', label: 'Latest', title: 'Newest messages first' },
+  { id: 'up', label: 'Up', title: 'Most up votes first' },
+  { id: 'down', label: 'Down', title: 'Messages with down votes' },
+];
 
 export default function LatestMessagesBlocks() {
 
@@ -16,13 +22,13 @@ export default function LatestMessagesBlocks() {
   const [opReturns, setOpReturns] = useState([]);
   const [theblocknote, setTheBlockNote] = useState([]);
   const [txids, setTxids] = useState([]);
-  const [votedMessages, setVotedMessages] = useState(new Set()); // Track voted messages
   const [page, setPage] = useState(0);
   const [voteNotice, setVoteNotice] = useState(null);
   const [votingIndex, setVotingIndex] = useState(null);
   const [openVoteLists, setOpenVoteLists] = useState(() => new Set());
   const [loading, setLoading] = useState(true);
-  const { refs, ensureUtxoHex } = useContext(SharedContext);
+  const [sortMode, setSortMode] = useState('latest');
+  const { refs, ensureUtxoHex, refreshRefs } = useContext(SharedContext);
   const hasFundedUnit = Boolean(getHighestFundedUnit(Array.isArray(refs) ? refs : [], 450));
 
   function formatTimestampToUTC(timestampInSeconds) {
@@ -105,12 +111,14 @@ export default function LatestMessagesBlocks() {
         )
       );
       setOpenVoteLists((prev) => new Set([...prev, messageIndex]));
-      setVotedMessages((prev) => new Set([...prev, `${messageIndex}-${direction}`]));
       setVoteNotice({
         type: 'success',
         text: direction === 'up' ? 'Up vote recorded on the blockchain.' : 'Down vote recorded on the blockchain.',
         url: result.explorerUrl,
       });
+      if (refreshRefs) {
+        await refreshRefs({ watch: true, address: selectedUnit.public_key });
+      }
     } catch (error) {
       setVoteNotice({ type: 'error', text: error.message || 'The vote could not be sent.' });
     } finally {
@@ -368,19 +376,6 @@ export default function LatestMessagesBlocks() {
 
     theblocknote.sort((a, b) => b.time - a.time);
     setTheBlockNote(theblocknote);
-
-    const rememberedVotes = new Set();
-    for (const row of readImmutablesOverlay()) {
-      const matched = String(row?.value || '').match(/"([^"]+)"|[^\s"]+/g);
-      if (!matched) continue;
-      const parts = matched.map((part) => part.replace(/^"|"$/g, ''));
-      if (parts[0] !== 't') continue;
-      const type = parts[2];
-      const target = `${parts[3]}_${parts[4]}`;
-      if (type === '1') rememberedVotes.add(`${target}-up`);
-      if (type === '-1') rememberedVotes.add(`${target}-down`);
-    }
-    setVotedMessages(rememberedVotes);
     } catch (error) {
       console.error('Failed to load immutables.json', error);
     } finally {
@@ -400,14 +395,33 @@ export default function LatestMessagesBlocks() {
     return () => window.clearInterval(poll);
   }, []);
 
-  useEffect(() => {
-    const lastPage = Math.max(0, Math.ceil(theblocknote.length / PAGE_SIZE) - 1);
-    setPage((current) => Math.min(current, lastPage));
-  }, [theblocknote.length]);
+  const visibleMessages = useMemo(() => {
+    const rows = [...theblocknote];
+    if (sortMode === 'up') {
+      rows.sort((a, b) => b.ups - a.ups || b.time - a.time);
+      return rows;
+    }
+    if (sortMode === 'down') {
+      return rows
+        .filter((row) => row.downs > 0)
+        .sort((a, b) => b.downs - a.downs || b.time - a.time);
+    }
+    rows.sort((a, b) => b.time - a.time);
+    return rows;
+  }, [theblocknote, sortMode]);
 
-  const totalPages = Math.max(1, Math.ceil(theblocknote.length / PAGE_SIZE));
+  useEffect(() => {
+    setPage(0);
+  }, [sortMode]);
+
+  useEffect(() => {
+    const lastPage = Math.max(0, Math.ceil(visibleMessages.length / PAGE_SIZE) - 1);
+    setPage((current) => Math.min(current, lastPage));
+  }, [visibleMessages.length]);
+
+  const totalPages = Math.max(1, Math.ceil(visibleMessages.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages - 1);
-  const pagedMessages = theblocknote.slice(
+  const pagedMessages = visibleMessages.slice(
     currentPage * PAGE_SIZE,
     currentPage * PAGE_SIZE + PAGE_SIZE
   );
@@ -424,9 +438,43 @@ export default function LatestMessagesBlocks() {
         className="w-full"
     >
     {<GlassCard className="p-6 md:p-8">
-      <div className="flex items-center gap-3 mb-6">
-          <Activity className="w-6 h-6 text-blue-400" />
-          <h2 className="text-2xl font-bold text-white">Latest Messages</h2>
+      <div className="flex items-start justify-between gap-3 mb-6">
+          <div className="flex items-center gap-3 min-w-0">
+            <Activity className="w-6 h-6 text-blue-400 shrink-0" />
+            <h2 className="text-2xl font-bold text-white">Latest Messages</h2>
+          </div>
+          <div
+            role="group"
+            aria-label="Filter messages"
+            className="flex shrink-0 items-center rounded-full border border-white/10 bg-white/5 p-0.5"
+          >
+            {SORT_MODES.map((mode) => {
+              const active = sortMode === mode.id;
+              return (
+                <button
+                  key={mode.id}
+                  type="button"
+                  title={mode.title}
+                  aria-pressed={active}
+                  onClick={() => setSortMode(mode.id)}
+                  className={`flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium transition-colors ${
+                    active
+                      ? 'bg-white/15 text-white'
+                      : 'text-white/45 hover:text-white/80'
+                  }`}
+                >
+                  {mode.id === 'latest' ? (
+                    <Clock className="w-3 h-3" />
+                  ) : mode.id === 'up' ? (
+                    <ChevronUp className="w-3 h-3" />
+                  ) : (
+                    <ChevronDown className="w-3 h-3" />
+                  )}
+                  {mode.label}
+                </button>
+              );
+            })}
+          </div>
       </div>
 
       {voteNotice?.type === 'success' && (
@@ -470,7 +518,9 @@ export default function LatestMessagesBlocks() {
       ) : (
       <div>
       {pagedMessages.length === 0 ? (
-        <p className="text-white/50 text-sm py-8 text-center">No messages yet.</p>
+        <p className="text-white/50 text-sm py-8 text-center">
+          {sortMode === 'down' ? 'No down votes yet.' : 'No messages yet.'}
+        </p>
       ) : null}
       <ul>
         {pagedMessages.map((t, index) => (
@@ -499,15 +549,11 @@ export default function LatestMessagesBlocks() {
                 <button
                   type="button"
                   onClick={() => handleVoteUp(t.index)}
-                  disabled={!hasFundedUnit || votingIndex === t.index || votedMessages.has(`${t.index}-up`) || votedMessages.has(`${t.index}-down`)}
-                  title={!hasFundedUnit ? 'Load a funded unit on Spark to vote' : undefined}
+                  disabled={!hasFundedUnit || votingIndex === t.index}
+                  title={!hasFundedUnit ? 'Load a funded unit on Spark to vote' : 'Vote up'}
                   className={`
                     flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200
                     ${!hasFundedUnit || votingIndex === t.index
-                      ? 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
-                      : votedMessages.has(`${t.index}-up`)
-                      ? 'bg-green-500/30 text-green-400 cursor-not-allowed'
-                      : votedMessages.has(`${t.index}-down`)
                       ? 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
                       : 'bg-white/10 text-white hover:bg-green-500/20 hover:text-green-400 hover:scale-105'
                     }
@@ -521,15 +567,11 @@ export default function LatestMessagesBlocks() {
                 <button
                   type="button"
                   onClick={() => handleVoteDown(t.index)}
-                  disabled={!hasFundedUnit || votingIndex === t.index || votedMessages.has(`${t.index}-up`) || votedMessages.has(`${t.index}-down`)}
-                  title={!hasFundedUnit ? 'Load a funded unit on Spark to vote' : undefined}
+                  disabled={!hasFundedUnit || votingIndex === t.index}
+                  title={!hasFundedUnit ? 'Load a funded unit on Spark to vote' : 'Vote down'}
                   className={`
                     flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200
                     ${!hasFundedUnit || votingIndex === t.index
-                      ? 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
-                      : votedMessages.has(`${t.index}-down`)
-                      ? 'bg-red-500/30 text-red-400 cursor-not-allowed'
-                      : votedMessages.has(`${t.index}-up`)
                       ? 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
                       : 'bg-white/10 text-white hover:bg-red-500/20 hover:text-red-400 hover:scale-105'
                     }
@@ -593,7 +635,7 @@ export default function LatestMessagesBlocks() {
         ))}
       </ul>
 
-      {theblocknote.length > PAGE_SIZE && (
+      {visibleMessages.length > PAGE_SIZE && (
         <div className="flex items-center justify-center gap-4 mt-2">
           <button
             type="button"

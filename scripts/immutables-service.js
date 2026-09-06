@@ -1,7 +1,7 @@
 import http from 'node:http'
 import fs from 'node:fs'
 import path from 'node:path'
-import { parseArgs, runIndexer, runIndexerUntilTip } from '../services/ImmutableIndexer.js'
+import { explorerChain, parseArgs, runIndexer, runIndexerUntilTip } from '../services/ImmutableIndexer.js'
 import { publishImmutables } from '../services/immutables/publishImmutables.js'
 import { handleLivePresence } from '../services/livePresence.js'
 
@@ -149,7 +149,7 @@ Usage:
 
 This process:
   1. Resumes from the local checkpoint
-  2. Walks Blockstream blocks until chain tip
+  2. Walks Haskoin, then mempool.space, then other explorers until chain tip
   3. Writes data/immutables.json (and the public copy)
   4. Stays running and polls for new blocks
   5. Publishes to IPFS when IPFS_API or PINATA_JWT is set
@@ -158,11 +158,15 @@ Options:
   --once              Index to tip once, then exit
   --from <height>     Start block (default: ${PROTOCOL_START})
   --overlap <n>       Re-scan last n blocks each pass (default: 8)
-  --concurrency <n>   Parallel blocks (default: 8)
+  --concurrency <n>   Parallel workers (default: 32)
+  --workers <n>       Same as --concurrency
   --max-blocks <n>    Blocks per pass (default: 2500)
+  --delay <ms>        Pause before each block fetch (default: 0)
 
 Env:
   BLOCKSTREAM_CLIENT_ID / BLOCKSTREAM_CLIENT_SECRET
+  IMMUTABLES_CONCURRENCY   Parallel workers (default: 32)
+  IMMUTABLES_DELAY_MS      Pause before each block fetch (default: 80)
   IMMUTABLES_POLL_MS       Poll interval after catch-up (default: 60000)
   IMMUTABLES_HTTP_PORT     Status server port (default: ${DEFAULT_PORT}, 0 to disable)
   IMMUTABLES_HTTP_HOST     Bind address (default: 127.0.0.1)
@@ -173,14 +177,15 @@ Env:
 }
 
 const once = process.argv.includes('--once')
-const passedConcurrency = process.argv.includes('--concurrency')
+const passedConcurrency =
+  process.argv.includes('--concurrency') || process.argv.includes('--workers')
 const passedDelay = process.argv.includes('--delay')
 const options = {
   ...cli,
   from: Number.isFinite(cli.from) ? cli.from : PROTOCOL_START,
   overlap: cli.overlap || 8,
-  concurrency: passedConcurrency ? cli.concurrency : 2,
-  delay: passedDelay ? cli.delay : 200,
+  concurrency: passedConcurrency ? cli.concurrency : envNumber('IMMUTABLES_CONCURRENCY', 32),
+  delay: passedDelay ? cli.delay : envNumber('IMMUTABLES_DELAY_MS', 80),
   maxBlocks: cli.maxBlocks || envNumber('IMMUTABLES_MAX_BLOCKS', 2500),
   untilTip: cli.to == null,
   resume: true,
@@ -207,8 +212,9 @@ const stop = () => {
 process.on('SIGINT', stop)
 process.on('SIGTERM', stop)
 
+status.concurrency = options.concurrency
 console.log(
-  `Immutables service starting (${options.blockstreamOnly ? 'Blockstream only' : 'multi-explorer'}, overlap ${options.overlap}, concurrency ${options.concurrency})`
+  `Immutables service starting (${explorerChain().join(' → ')}, overlap ${options.overlap}, ${options.concurrency} workers)`
 )
 
 try {

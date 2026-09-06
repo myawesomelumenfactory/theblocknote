@@ -1,11 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import './App.css'
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import PowerPage from '../pages/PowerPage';
 import MainPage from '../pages/MainPage';
 import ReadPage from '../pages/ReadPage';
 import GeneratePage from '../pages/GeneratePage';
-import StatusPage from '../pages/StatusPage';
 import LiveVisitBeacon from '../components/LiveVisitBeacon';
 import { SharedContext } from '../src/SharedContext';
 import { fetchBalances, fetchTipHeight, fetchTxHex, fetchUnspents } from '../services/HaskoinStore';
@@ -308,7 +307,7 @@ function App() {
                 <Route path="/power" element={<PowerPage />} />
                 <Route path="/read" element={<ReadPage />} />
                 <Route path="/generate" element={<GeneratePage />} />
-                <Route path="/status" element={<StatusPage />} />
+                <Route path="/status" element={<Navigate to="/" replace />} />
 
               </Routes>
           </div>

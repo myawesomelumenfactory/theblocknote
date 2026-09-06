@@ -10,25 +10,38 @@ const { Block } = bitcoinjs;
 const TOKEN_URL = 'https://login.blockstream.com/realms/blockstream-public/protocol/openid-connect/token';
 const ENTERPRISE_API = 'https://enterprise.blockstream.info/api';
 
-const PUBLIC_EXPLORERS = [
-  {
+function blockchainInfoExplorer() {
+  return {
     name: 'blockchain.info',
     kind: 'rawblock',
     blockHeight: (height) =>
       `https://blockchain.info/block-height/${height}?format=json`,
     tip: 'https://blockchain.info/q/getblockcount',
-  },
-  {
-    name: 'mempool.space',
-    kind: 'esplora',
-    base: 'https://mempool.space/api',
-  },
-  {
-    name: 'blockstream',
-    kind: 'esplora',
-    base: 'https://blockstream.info/api',
-  },
-];
+  };
+}
+
+function haskoinExplorer() {
+  return {
+    name: 'haskoin',
+    kind: 'haskoin',
+    base: 'https://api.blockchain.info/haskoin-store/btc',
+  };
+}
+
+function esploraExplorer(name, base) {
+  return { name, kind: 'esplora', base };
+}
+
+/** Tried in order. A skipped host is dropped for the rest of this process. */
+function fallbackExplorers() {
+  return [
+    haskoinExplorer(),
+    esploraExplorer('mempool.space', 'https://mempool.space/api'),
+    esploraExplorer('blockstream', 'https://blockstream.info/api'),
+    esploraExplorer('mempool.emzy.de', 'https://mempool.emzy.de/api'),
+    blockchainInfoExplorer(),
+  ];
+}
 
 let cachedToken = null;
 let tokenExpiresAt = 0;
@@ -48,51 +61,45 @@ function loadDotEnv() {
   }
 }
 
-function getExplorers(options = {}) {
-  const explorers = [];
-  if (
-    !skipEnterprise &&
-    process.env.BLOCKSTREAM_CLIENT_ID &&
-    process.env.BLOCKSTREAM_CLIENT_SECRET
-  ) {
+const skippedExplorers = new Set();
+
+function explorerNameFromUrl(url) {
+  const value = String(url);
+  if (value.startsWith(ENTERPRISE_API) || value.includes('enterprise.blockstream.info')) {
+    return 'blockstream-enterprise';
+  }
+  if (value.includes('haskoin-store')) return 'haskoin';
+  if (value.includes('://mempool.space/')) return 'mempool.space';
+  if (value.includes('mempool.emzy.de')) return 'mempool.emzy.de';
+  if (value.includes('://blockstream.info/')) return 'blockstream';
+  if (value.includes('://blockchain.info/')) return 'blockchain.info';
+  return null;
+}
+
+function skipExplorer(name, reason) {
+  if (!name || skippedExplorers.has(name)) return;
+  skippedExplorers.add(name);
+  console.warn(`  ${name} ${reason}; using the next explorer`);
+}
+
+function getExplorers() {
+  const explorers = fallbackExplorers();
+  if (process.env.BLOCKSTREAM_CLIENT_ID && process.env.BLOCKSTREAM_CLIENT_SECRET) {
     explorers.push({
       name: 'blockstream-enterprise',
       kind: 'esplora',
       base: ENTERPRISE_API,
     });
   }
-  if (options.blockstreamOnly) {
-    if (!skipBlockstreamPublic) {
-      explorers.push({
-        name: 'blockstream',
-        kind: 'esplora',
-        base: 'https://blockstream.info/api',
-      });
-    }
-    if (!skipMempool) {
-      explorers.push({
-        name: 'mempool.space',
-        kind: 'esplora',
-        base: 'https://mempool.space/api',
-      });
-    }
-    explorers.push({
-      name: 'blockchain.info',
-      kind: 'rawblock',
-      blockHeight: (height) =>
-        `https://blockchain.info/block-height/${height}?format=json`,
-      tip: 'https://blockchain.info/q/getblockcount',
-    });
-    return explorers;
-  }
-  explorers.push(
-    ...PUBLIC_EXPLORERS.filter((row) => {
-      if (skipMempool && row.name === 'mempool.space') return false;
-      if (skipBlockstreamPublic && row.name === 'blockstream') return false;
-      return true;
-    })
-  );
+  const available = explorers.filter((row) => !skippedExplorers.has(row.name));
+  if (available.length) return available;
+  skippedExplorers.clear();
+  console.warn('  All explorers were skipped; retrying the full list');
   return explorers;
+}
+
+export function explorerChain() {
+  return getExplorers().map((row) => row.name);
 }
 
 async function getEnterpriseToken() {
@@ -137,14 +144,9 @@ function isRetryableHttpStatus(status) {
   return status === 429 || status >= 500;
 }
 
-let skipEnterprise = false;
-let skipBlockstreamPublic = false;
-let skipMempool = false;
-
 const FETCH_TIMEOUT_MS = 15_000;
 
-function isMempoolUnreachable(url, error) {
-  if (!String(url).includes('://mempool.space/')) return false;
+function isConnectFailure(error) {
   const code = error?.cause?.code || '';
   return (
     error?.name === 'TimeoutError' ||
@@ -156,19 +158,24 @@ function isMempoolUnreachable(url, error) {
   );
 }
 
-function noteExplorerFailure(url, status) {
-  if (url.startsWith(ENTERPRISE_API) && (status === 401 || status === 402 || status === 403)) {
-    if (!skipEnterprise) {
-      console.warn('  Blockstream enterprise unavailable; using public Blockstream API');
+function abandonHost(url, statusOrError) {
+  const name = explorerNameFromUrl(url);
+  if (typeof statusOrError === 'number') {
+    if (statusOrError === 429) {
+      skipExplorer(name, 'is rate-limited');
+      return true;
     }
-    skipEnterprise = true;
-  }
-  if (url.includes('://blockstream.info/') && status === 429) {
-    if (!skipBlockstreamPublic) {
-      console.warn('  Public Blockstream is rate-limited; using the next explorer');
+    if (statusOrError === 401 || statusOrError === 402 || statusOrError === 403) {
+      skipExplorer(name, 'unavailable');
+      return true;
     }
-    skipBlockstreamPublic = true;
+    return false;
   }
+  if (isConnectFailure(statusOrError)) {
+    skipExplorer(name, 'unreachable');
+    return true;
+  }
+  return false;
 }
 
 async function fetchText(url, { retries = 6 } = {}) {
@@ -189,8 +196,7 @@ async function fetchText(url, { retries = 6 } = {}) {
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
 
-      if (response.status === 429 && url.includes('://blockstream.info/')) {
-        noteExplorerFailure(url, response.status);
+      if (abandonHost(url, response.status)) {
         const error = new Error(`HTTP ${response.status} for ${url}`);
         error.status = response.status;
         throw error;
@@ -204,7 +210,7 @@ async function fetchText(url, { retries = 6 } = {}) {
       }
 
       if (!response.ok) {
-        noteExplorerFailure(url, response.status);
+        abandonHost(url, response.status);
         const error = new Error(`HTTP ${response.status} for ${url}`);
         error.status = response.status;
         throw error;
@@ -213,14 +219,7 @@ async function fetchText(url, { retries = 6 } = {}) {
       return await response.text();
     } catch (error) {
       lastError = error;
-      if (isMempoolUnreachable(url, error)) {
-        if (!skipMempool) {
-          console.warn('  mempool.space unreachable; using blockchain.info fallback');
-        }
-        skipMempool = true;
-        throw error;
-      }
-      if (error.status === 429 && skipBlockstreamPublic) {
+      if (abandonHost(url, error) || skippedExplorers.has(explorerNameFromUrl(url))) {
         throw error;
       }
       if (error.status && !isRetryableHttpStatus(error.status)) {
@@ -253,8 +252,7 @@ async function fetchBuffer(url, { retries = 6 } = {}) {
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
 
-      if (response.status === 429 && url.includes('://blockstream.info/')) {
-        noteExplorerFailure(url, response.status);
+      if (abandonHost(url, response.status)) {
         const error = new Error(`HTTP ${response.status} for ${url}`);
         error.status = response.status;
         throw error;
@@ -268,7 +266,7 @@ async function fetchBuffer(url, { retries = 6 } = {}) {
       }
 
       if (!response.ok) {
-        noteExplorerFailure(url, response.status);
+        abandonHost(url, response.status);
         const error = new Error(`HTTP ${response.status} for ${url}`);
         error.status = response.status;
         throw error;
@@ -277,14 +275,7 @@ async function fetchBuffer(url, { retries = 6 } = {}) {
       return Buffer.from(await response.arrayBuffer());
     } catch (error) {
       lastError = error;
-      if (isMempoolUnreachable(url, error)) {
-        if (!skipMempool) {
-          console.warn('  mempool.space unreachable; using blockchain.info fallback');
-        }
-        skipMempool = true;
-        throw error;
-      }
-      if (error.status === 429 && skipBlockstreamPublic) {
+      if (abandonHost(url, error) || skippedExplorers.has(explorerNameFromUrl(url))) {
         throw error;
       }
       if (error.status && !isRetryableHttpStatus(error.status)) {
@@ -398,6 +389,27 @@ async function fetchBlockViaEsploraRaw(explorer, height, options) {
   return extractFromBitcoinBlock(block, options);
 }
 
+async function fetchBlockViaHaskoin(explorer, height, options) {
+  const payload = await fetchJson(`${explorer.base}/block/height/${height}?notx=true`);
+  const header = Array.isArray(payload)
+    ? payload.find((row) => row?.mainchain && row.height === height) || payload[0]
+    : payload;
+  const hash = header?.hash;
+  if (!hash) {
+    throw new Error(`No haskoin block hash at ${height}`);
+  }
+  const raw = await fetchJson(`${explorer.base}/block/${hash}/raw`);
+  const hex = typeof raw === 'string' ? raw : raw?.result;
+  if (!hex || typeof hex !== 'string') {
+    throw new Error(`Empty haskoin raw block at ${height}`);
+  }
+  const block = Block.fromBuffer(Buffer.from(hex, 'hex'));
+  if (!block.transactions?.length) {
+    throw new Error(`Empty haskoin transactions at ${height}`);
+  }
+  return extractFromBitcoinBlock(block, options);
+}
+
 async function fetchBlock(height, options) {
   let lastError;
 
@@ -406,9 +418,13 @@ async function fetchBlock(height, options) {
       if (explorer.kind === 'rawblock') {
         return await fetchBlockViaRaw(explorer, height, options);
       }
+      if (explorer.kind === 'haskoin') {
+        return await fetchBlockViaHaskoin(explorer, height, options);
+      }
       try {
         return await fetchBlockViaEsploraRaw(explorer, height, options);
       } catch (rawError) {
+        if (skippedExplorers.has(explorer.name)) throw rawError;
         console.warn(`  ${explorer.name} raw block failed at ${height}: ${rawError.message}`);
         return await fetchBlockViaEsplora(explorer, height, options);
       }
@@ -426,6 +442,12 @@ async function fetchTipHeight(options = {}) {
     try {
       if (explorer.kind === 'rawblock') {
         return Number.parseInt(await fetchText(explorer.tip), 10);
+      }
+      if (explorer.kind === 'haskoin') {
+        const best = await fetchJson(`${explorer.base}/block/best?notx=true`);
+        const height = Number(best?.height);
+        if (!Number.isFinite(height)) throw new Error('Invalid haskoin tip');
+        return height;
       }
       return Number.parseInt(await fetchText(`${explorer.base}/blocks/tip/height`), 10);
     } catch (error) {
@@ -477,7 +499,7 @@ export function parseArgs(argv = process.argv.slice(2)) {
     } else if (arg === '--delay') {
       options.delay = Number.parseInt(next, 10);
       i++;
-    } else if (arg === '--concurrency') {
+    } else if (arg === '--concurrency' || arg === '--workers') {
       options.concurrency = Math.max(1, Number.parseInt(next, 10));
       i++;
     } else if (arg === '--out') {
@@ -515,14 +537,14 @@ Options:
   --from <height>     Start block (default: 906867, when The Block Note began)
   --to <height>       End block inclusive (default: current chain tip)
   --delay <ms>        Pause between blocks in a batch (default: 150)
-  --concurrency <n>   Blocks to fetch in parallel (default: 6)
+  --concurrency <n>   Parallel workers (default: 6)
   --out <path>        Output file (default: data/immutables.json)
   --all-op-return     Keep every OP_RETURN, not only protocol "t ..." lines
   --no-resume         Ignore checkpoint and rewrite the output file
   --overlap <n>       Re-scan the last n blocks before continuing to tip (default: 0)
   --max-blocks <n>    Stop after n blocks this pass (useful for CI)
   --until-tip         Keep scanning passes until chain tip or INDEX_DEADLINE_MS
-  --blockstream       Use only the Blockstream API (enterprise if configured)
+  --blockstream       Same fallback chain (haskoin → mempool.space → others)
 
 Examples:
   npm run index:immutables
@@ -606,6 +628,7 @@ export async function runIndexer(options) {
   console.log(
     `Indexing blocks ${from} → ${to} of tip ${tip} (${options.protocolOnly ? 'protocol t … only' : 'all OP_RETURN'}, concurrency ${options.concurrency})`
   );
+  console.log(`Explorers: ${explorerChain().join(' → ')}`);
 
   let shouldStop = false;
   const onSignal = () => {
@@ -616,55 +639,24 @@ export async function runIndexer(options) {
   process.on('SIGTERM', onSignal);
 
   const seen = new Set(records.map((row) => `${row.index}:${row.value}`));
-  const concurrency = options.concurrency || 1;
+  const concurrency = Math.max(1, options.concurrency || 1);
+  const writeEvery = Math.max(concurrency, 8);
 
   try {
-    for (let height = from; height <= to; height += concurrency) {
-      if (shouldStop) break;
+    const pending = new Map();
+    let nextHeight = from;
+    let commitHeight = from;
+    let lastPersisted = from - 1;
+    let addedSinceLog = 0;
+    let persistLock = Promise.resolve();
 
-      const batchEnd = Math.min(height + concurrency - 1, to);
-      const batch = [];
-      for (let h = height; h <= batchEnd; h++) {
-        batch.push(h);
-      }
-
-      const results = await Promise.all(
-        batch.map(async (h, i) => {
-          if (i > 0 && options.delay) {
-            await sleep(options.delay * i);
-          }
-          const found = await fetchBlock(h, options);
-          return { height: h, found };
-        })
-      );
-
-      results.sort((a, b) => a.height - b.height);
-
-      let added = 0;
-      for (const { found } of results) {
-        for (const row of found) {
-          const key = `${row.index}:${row.value}`;
-          if (seen.has(key)) continue;
-          seen.add(key);
-          records.push(row);
-          added++;
-        }
-      }
-
-      lastHeight = batchEnd;
-      const scanned = batchEnd - startHeight + 1;
-      const span = Math.max(1, to - startHeight + 1);
-      const percent = Math.min(100, (scanned / span) * 100);
-      console.log(
-        `Blocks ${height}–${batchEnd}/${to} — ${percent.toFixed(1)}% — ${to - batchEnd} left — +${added} message(s), ${records.length} total`
-      );
-
+    const persist = async () => {
       await writeJson(options.out, records);
       if (publicCopy) {
         await writeJson(publicCopy, records);
       }
       const nextState = {
-        lastHeight: batchEnd,
+        lastHeight,
         from: options.from,
         to,
         tip,
@@ -681,6 +673,59 @@ export async function runIndexer(options) {
           await writeJson(publicState, nextState);
         }
       }
+      const scanned = (lastHeight ?? startHeight) - startHeight + 1;
+      const span = Math.max(1, to - startHeight + 1);
+      const percent = Math.min(100, (scanned / span) * 100);
+      console.log(
+        `Blocks ${lastPersisted + 1}–${lastHeight}/${to} — ${percent.toFixed(1)}% — ${to - lastHeight} left — +${addedSinceLog} message(s), ${records.length} total`
+      );
+      lastPersisted = lastHeight;
+      addedSinceLog = 0;
+    };
+
+    const flushCommitted = async () => {
+      while (pending.has(commitHeight)) {
+        const found = pending.get(commitHeight);
+        pending.delete(commitHeight);
+        for (const row of found) {
+          const key = `${row.index}:${row.value}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          records.push(row);
+          addedSinceLog++;
+        }
+        lastHeight = commitHeight;
+        commitHeight += 1;
+      }
+      if (
+        lastHeight != null &&
+        lastHeight > lastPersisted &&
+        (lastHeight - lastPersisted >= writeEvery || lastHeight >= to || shouldStop)
+      ) {
+        await persist();
+      }
+    };
+
+    const worker = async () => {
+      while (!shouldStop) {
+        const height = nextHeight;
+        if (height > to) return;
+        nextHeight += 1;
+        if (options.delay) await sleep(options.delay);
+        const found = await fetchBlock(height, options);
+        persistLock = persistLock.then(async () => {
+          pending.set(height, found);
+          await flushCommitted();
+        });
+      }
+    };
+
+    const workerCount = Math.min(concurrency, Math.max(1, to - from + 1));
+    console.log(`Using ${workerCount} parallel workers`);
+    await Promise.all(Array.from({ length: workerCount }, () => worker()));
+    await persistLock;
+    if (lastHeight != null && lastHeight > lastPersisted) {
+      await persist();
     }
   } finally {
     process.off('SIGINT', onSignal);

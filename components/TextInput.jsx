@@ -1,14 +1,14 @@
 
-import React, { useState } from "react";
-import { motion } from "framer-motion";
+import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Type, AlertCircle } from "lucide-react";
-import { useEffect } from 'react';
 
 const DEFAULT_PLACEHOLDERS = [
   "Your ideas matter, write them. Forever.",
   "Freedom of Speech. For all.",
   "Raise your voice without interruption",
   "Your opinions has always been valuable",
+  "This area is for everyone and anyone",
 ];
 
 export default function TextInput({ 
@@ -23,6 +23,7 @@ export default function TextInput({
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const remainingChars = maxLength - value.length;
   const placeholder = placeholderOptions[placeholderIndex % placeholderOptions.length] || "";
+  const showPlaceholder = !value;
 
   useEffect(() => {
     if (value || isFocused) return undefined;
@@ -45,11 +46,11 @@ export default function TextInput({
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           maxLength={maxLength}
-          placeholder={placeholder}
+          aria-label={placeholder || "Write your message"}
           className={`
             w-full h-32 pl-12 pr-4 py-4 
             backdrop-blur-xl bg-white-900/10 rounded-2xl border border-white/20
-            text-base text-white placeholder:text-2xl placeholder:text-white/55 placeholder:leading-snug resize-none
+            text-base text-white resize-none
             focus:outline-none focus:bg-white-900/20 focus:border-white-500/50
             focus:shadow-[0_0_0_3px_rgba(255,165,0,0.1)]
             transition-all duration-300 font-medium
@@ -59,6 +60,27 @@ export default function TextInput({
             fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
           }}
         />
+
+        <div className="pointer-events-none absolute left-12 right-4 top-4 h-16 overflow-hidden">
+          <AnimatePresence mode="wait">
+            {showPlaceholder && (
+              <motion.span
+                key={placeholder}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12 }}
+                transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+                aria-hidden="true"
+                className="absolute inset-x-0 top-0 text-2xl leading-snug text-white/55 font-medium"
+                style={{
+                  fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+                }}
+              >
+                {placeholder}
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </div>
         
         {/* Character counter */}
           <motion.div 
