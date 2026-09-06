@@ -69,11 +69,18 @@ export async function publishImmutables(filePath) {
     }
   }
 
-  const receiptPath = path.resolve('data/immutables-ipfs.json')
-  await fs.mkdir(path.dirname(receiptPath), { recursive: true })
-  await fs.writeFile(
-    receiptPath,
-    `${JSON.stringify({ ...published, publishedAt: new Date().toISOString() }, null, 2)}\n`
-  )
+  const receipt = {
+    ...published,
+    publishedAt: new Date().toISOString(),
+  }
+  const payload = `${JSON.stringify(receipt, null, 2)}\n`
+  const receiptPaths = [
+    path.resolve('data/immutables-ipfs.json'),
+    path.resolve('public/data/immutables-ipfs.json'),
+  ]
+  for (const receiptPath of receiptPaths) {
+    await fs.mkdir(path.dirname(receiptPath), { recursive: true })
+    await fs.writeFile(receiptPath, payload)
+  }
   return published
 }

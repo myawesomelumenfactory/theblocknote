@@ -1,41 +1,74 @@
-import { explorerJson, explorerText, explorerTipHeight } from './BlockstreamExplorer.js'
 import { recordsFromEsploraTxs } from './immutableProtocol.js'
 
-export const LIVE_FILL_MAX_BLOCKS = 8
+const MEMPOOL = 'https://mempool.space/api'
+const EXPLORERS = [MEMPOOL, 'https://blockstream.info/api']
 
-let liveFillCache = { key: '', extra: [] }
-
-async function recordsFromHeight(height) {
-  const hash = String((await explorerText(`/block-height/${height}`)) || '').trim()
-  if (!hash) return []
-  const header = await explorerJson(`/block/${hash}`)
-  const blockTime = header?.timestamp
-  const txCount = header?.tx_count || 0
-  const pageSize = 25
-  let records = []
-
-  for (let start = 0; start < txCount; start += pageSize) {
-    const pathSuffix = start === 0 ? '' : `/${start}`
-    const txs = await explorerJson(`/block/${hash}/txs${pathSuffix}`)
-    records = records.concat(recordsFromEsploraTxs(txs, blockTime, true))
-  }
-
-  return records
+async function fetchText(url) {
+  const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(12_000) })
+  if (!response.ok) throw new Error(`${response.status} ${url}`)
+  return (await response.text()).trim()
 }
 
-export async function fillRecentImmutables(lastHeight) {
-  if (!Number.isFinite(lastHeight)) return []
-  const tip = await explorerTipHeight()
-  if (!tip || tip <= lastHeight) return []
-  if (tip - lastHeight > LIVE_FILL_MAX_BLOCKS) return []
+async function fetchJson(url) {
+  const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(12_000) })
+  if (!response.ok) throw new Error(`${response.status} ${url}`)
+  return response.json()
+}
 
-  const key = `${lastHeight}:${tip}`
-  if (liveFillCache.key === key) return liveFillCache.extra
+async function recordsFromHeight(height) {
+  let lastError
+
+  for (const base of EXPLORERS) {
+    try {
+      const hash = await fetchText(`${base}/block-height/${height}`)
+      if (!hash) throw new Error(`No block hash at ${height}`)
+      const header = await fetchJson(`${base}/block/${hash}`)
+      const blockTime = header?.timestamp
+      const txCount = header?.tx_count || 0
+      const pageSize = 25
+      let records = []
+
+      for (let start = 0; start < txCount; start += pageSize) {
+        const pathSuffix = start === 0 ? '' : `/${start}`
+        const txs = await fetchJson(`${base}/block/${hash}/txs${pathSuffix}`)
+        records = records.concat(recordsFromEsploraTxs(txs, blockTime, true))
+      }
+
+      return records
+    } catch (error) {
+      lastError = error
+    }
+  }
+
+  throw lastError || new Error(`Failed to read block ${height}`)
+}
+
+export async function mempoolTipHeight() {
+  for (const base of EXPLORERS) {
+    try {
+      const tip = Number.parseInt(await fetchText(`${base}/blocks/tip/height`), 10)
+      if (Number.isFinite(tip) && tip > 0) return tip
+    } catch {
+      // Try the next explorer.
+    }
+  }
+  return 0
+}
+
+export async function catchUpImmutables(lastHeight, { onBlock } = {}) {
+  const tip = await mempoolTipHeight()
+  if (!Number.isFinite(lastHeight) || !tip || tip <= lastHeight) {
+    return { extra: [], tip, lastHeight: Number.isFinite(lastHeight) ? lastHeight : null }
+  }
 
   const extra = []
+  let scannedTo = lastHeight
   for (let height = lastHeight + 1; height <= tip; height++) {
-    extra.push(...(await recordsFromHeight(height)))
+    const added = await recordsFromHeight(height)
+    extra.push(...added)
+    scannedTo = height
+    await onBlock?.({ height, tip, added })
   }
-  liveFillCache = { key, extra }
-  return extra
+
+  return { extra, tip, lastHeight: scannedTo }
 }

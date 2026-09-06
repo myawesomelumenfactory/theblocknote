@@ -1,14 +1,8 @@
-import { fillRecentImmutables } from './ImmutableLiveFill.js'
+import { catchUpImmutables } from './ImmutableLiveFill.js'
 
 const OVERLAY_KEY = 'immutablesOverlay'
-
-export const PUBLISHED_IMMUTABLES_URL =
-  import.meta.env.VITE_IMMUTABLES_URL ||
-  'https://raw.githubusercontent.com/myawesomelumenfactory/theblocknote/main/public/data/immutables.json'
-
-export const PUBLISHED_STATE_URL =
-  import.meta.env.VITE_IMMUTABLES_STATE_URL ||
-  'https://raw.githubusercontent.com/myawesomelumenfactory/theblocknote/main/public/data/immutables-state.json'
+const RECORDS_KEY = 'theblocknote.immutables'
+const STATE_KEY = 'theblocknote.immutablesState'
 
 export function readImmutablesOverlay() {
   try {
@@ -28,9 +22,85 @@ export function mergeImmutables(base, extra) {
   return [...byIndex.values()]
 }
 
+function readStoredRecords() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(RECORDS_KEY) || '[]')
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function readStoredState() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(STATE_KEY) || 'null')
+    return parsed && typeof parsed === 'object' ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+function parseState(raw, records = []) {
+  const lastHeight = Number(raw?.lastHeight)
+  return {
+    lastHeight: Number.isFinite(lastHeight) ? lastHeight : null,
+    from: raw?.from ?? 906867,
+    to: raw?.to ?? lastHeight ?? null,
+    tip: Number(raw?.tip) || lastHeight || null,
+    count: Array.isArray(records) ? records.length : Number(raw?.count) || 0,
+    updatedAt: raw?.updatedAt || new Date().toISOString(),
+  }
+}
+
+function persistSnapshot(records, state) {
+  const nextState = parseState(state, records)
+  try {
+    localStorage.setItem(RECORDS_KEY, JSON.stringify(records))
+    localStorage.setItem(STATE_KEY, JSON.stringify(nextState))
+  } catch {
+    // Private mode or quota; the in-memory snapshot still renders.
+  }
+  return nextState
+}
+
+function hydrateFromBundled(bundledRecords, bundledState) {
+  const bundled = Array.isArray(bundledRecords) ? bundledRecords : []
+  const storedRecords = readStoredRecords()
+  const storedState = parseState(readStoredState(), storedRecords)
+  const pageState = parseState(bundledState, bundled)
+
+  const storedHeight = storedState.lastHeight
+  const pageHeight = pageState.lastHeight
+
+  if (!Number.isFinite(storedHeight) || (Number.isFinite(pageHeight) && pageHeight > storedHeight)) {
+    const records = mergeImmutables(storedRecords, bundled)
+    const state = persistSnapshot(records, {
+      ...pageState,
+      count: records.length,
+      updatedAt: new Date().toISOString(),
+    })
+    return { records, state }
+  }
+
+  const records = mergeImmutables(bundled, storedRecords)
+  const state = persistSnapshot(records, {
+    ...storedState,
+    count: records.length,
+    updatedAt: storedState.updatedAt || new Date().toISOString(),
+  })
+  return { records, state }
+}
+
 export async function appendImmutable(entry) {
   const overlay = mergeImmutables(readImmutablesOverlay(), [entry])
   localStorage.setItem(OVERLAY_KEY, JSON.stringify(overlay))
+
+  const records = mergeImmutables(readStoredRecords(), [entry])
+  persistSnapshot(records, {
+    ...parseState(readStoredState(), records),
+    count: records.length,
+    updatedAt: new Date().toISOString(),
+  })
 
   try {
     await fetch('/__immutables/append', {
@@ -39,50 +109,61 @@ export async function appendImmutable(entry) {
       body: JSON.stringify(entry),
     })
   } catch {
-    // Static hosts cannot write immutables.json; overlay still updates the UI.
+    // Static hosts cannot write the JSON files; localStorage still updates the UI.
   }
 
   return overlay
 }
 
-async function fetchJson(url) {
-  try {
-    const response = await fetch(url, { cache: 'no-store' })
-    if (!response.ok) return null
-    return await response.json()
-  } catch {
-    return null
-  }
+let catchUpInFlight = null
+
+function emitImmutablesUpdated() {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new Event('theblocknote:immutables'))
 }
 
-async function fetchImmutableList(url) {
-  const data = await fetchJson(url)
-  return Array.isArray(data) ? data : []
+function startCatchUp(lastHeight) {
+  if (catchUpInFlight) return catchUpInFlight
+
+  catchUpInFlight = (async () => {
+    const { extra, tip, lastHeight: scannedTo } = await catchUpImmutables(lastHeight, {
+      onBlock: ({ height, tip: chainTip, added }) => {
+        const records = mergeImmutables(readStoredRecords(), added)
+        persistSnapshot(records, {
+          ...parseState(readStoredState(), records),
+          lastHeight: height,
+          to: height,
+          tip: chainTip,
+          count: records.length,
+          updatedAt: new Date().toISOString(),
+        })
+      },
+    })
+
+    const records = mergeImmutables(readStoredRecords(), extra)
+    persistSnapshot(records, {
+      ...parseState(readStoredState(), records),
+      lastHeight: scannedTo ?? lastHeight,
+      to: scannedTo ?? lastHeight,
+      tip: tip || parseState(readStoredState(), records).tip,
+      count: records.length,
+      updatedAt: new Date().toISOString(),
+    })
+    if ((scannedTo ?? lastHeight) !== lastHeight || extra.length) {
+      emitImmutablesUpdated()
+    }
+    return records
+  })()
+    .catch(() => readStoredRecords())
+    .finally(() => {
+      catchUpInFlight = null
+    })
+
+  return catchUpInFlight
 }
 
-async function fetchPublishedState() {
-  const local = await fetchJson(`${import.meta.env.BASE_URL}data/immutables-state.json`)
-  const published = await fetchJson(PUBLISHED_STATE_URL)
-  const lastHeight = [published, local]
-    .map((row) => Number(row?.lastHeight))
-    .filter((height) => Number.isFinite(height))
-  return lastHeight.length ? Math.max(...lastHeight) : null
-}
-
-export async function loadImmutableRecords(bundled) {
-  let records = Array.isArray(bundled) ? bundled : []
-  records = mergeImmutables(
-    records,
-    await fetchImmutableList(`${import.meta.env.BASE_URL}data/immutables.json`)
-  )
-  records = mergeImmutables(records, await fetchImmutableList(PUBLISHED_IMMUTABLES_URL))
-
-  try {
-    const lastHeight = await fetchPublishedState()
-    records = mergeImmutables(records, await fillRecentImmutables(lastHeight))
-  } catch {
-    // Keep the published file if the live tip fill cannot run.
-  }
-
-  return mergeImmutables(records, readImmutablesOverlay())
+export async function loadImmutableRecords(bundledRecords, bundledState) {
+  const snapshot = hydrateFromBundled(bundledRecords, bundledState)
+  startCatchUp(snapshot.state.lastHeight)
+  return mergeImmutables(snapshot.records, readImmutablesOverlay())
 }

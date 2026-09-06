@@ -5,7 +5,7 @@ import { decodeOpReturn } from '../services/TheBlockNote';
 import { Activity, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Clock, List, Loader2 } from "lucide-react";
 import { applyVoteUp, applyVoteDown, getHighestFundedUnit } from '../services/BitcoinService';
 import { appendImmutable, loadImmutableRecords } from '../services/ImmutablesStore';
-import immutablesData from 'virtual:immutables';
+import immutablesData, { immutablesState } from 'virtual:immutables';
 import { SharedContext } from '../src/SharedContext';
 
 const PAGE_SIZE = 5;
@@ -345,8 +345,9 @@ export default function LatestMessagesBlocks() {
     });
 
     // Processing donws votes
-    theblocknote.forEach(m => {
-      const parts = m.index.split("_"); 
+      theblocknote.forEach(m => {
+      if (!m.index) return;
+      const parts = m.index.split("_");
       var hash = parts[0];
       var index = parts[1];
 
@@ -384,7 +385,7 @@ export default function LatestMessagesBlocks() {
   }
 
   const fetchMessages = async() => {
-    return loadImmutableRecords(immutablesData);
+    return loadImmutableRecords(immutablesData, immutablesState);
   }
 
   useEffect(() => {
@@ -392,7 +393,12 @@ export default function LatestMessagesBlocks() {
     const poll = window.setInterval(() => {
       fetchTheBlockNote();
     }, 30000);
-    return () => window.clearInterval(poll);
+    const onUpdate = () => fetchTheBlockNote();
+    window.addEventListener('theblocknote:immutables', onUpdate);
+    return () => {
+      window.clearInterval(poll);
+      window.removeEventListener('theblocknote:immutables', onUpdate);
+    };
   }, []);
 
   const visibleMessages = useMemo(() => {

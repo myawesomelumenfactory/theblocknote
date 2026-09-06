@@ -37,7 +37,8 @@ function serveDataDir() {
 function immutablesModule() {
   const virtualId = 'virtual:immutables'
   const resolvedId = `\0${virtualId}`
-  const sourceFile = path.resolve('data/immutables.json')
+  const recordsFile = path.resolve('data/immutables.json')
+  const stateFile = path.resolve('data/immutables-state.json')
 
   return {
     name: 'immutables-module',
@@ -46,8 +47,9 @@ function immutablesModule() {
     },
     load(id) {
       if (id !== resolvedId) return
-      const json = fs.existsSync(sourceFile) ? fs.readFileSync(sourceFile, 'utf8') : '[]'
-      return `export default ${json}`
+      const records = fs.existsSync(recordsFile) ? fs.readFileSync(recordsFile, 'utf8') : '[]'
+      const state = fs.existsSync(stateFile) ? fs.readFileSync(stateFile, 'utf8') : '{}'
+      return `export const immutablesState = ${state}\nexport default ${records}`
     },
   }
 }
