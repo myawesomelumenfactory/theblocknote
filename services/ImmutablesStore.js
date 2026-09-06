@@ -115,15 +115,93 @@ export async function appendImmutable(entry) {
   return overlay
 }
 
+const PROGRESS_EVENT = 'theblocknote:immutables-progress'
+
 let catchUpInFlight = null
+let lastProgress = {
+  scanning: false,
+  startHeight: null,
+  tip: null,
+  addedThisRun: 0,
+  error: null,
+}
+
+function emitWindow(name, detail) {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(detail === undefined ? new Event(name) : new CustomEvent(name, { detail }))
+}
 
 function emitImmutablesUpdated() {
-  if (typeof window === 'undefined') return
-  window.dispatchEvent(new Event('theblocknote:immutables'))
+  emitWindow('theblocknote:immutables')
+}
+
+export function getImmutablesProgress() {
+  const records = readStoredRecords()
+  const state = parseState(readStoredState(), records)
+  const lastHeight = state.lastHeight
+  const tip = Number(lastProgress.tip) || state.tip
+  const remaining =
+    Number.isFinite(lastHeight) && Number.isFinite(tip) ? Math.max(0, tip - lastHeight) : null
+  const startHeight = lastProgress.startHeight ?? lastHeight
+  const catchUpSpan =
+    Number.isFinite(tip) && Number.isFinite(startHeight) ? Math.max(1, tip - startHeight) : 1
+  const catchUpDone =
+    Number.isFinite(lastHeight) && Number.isFinite(startHeight)
+      ? Math.max(0, lastHeight - startHeight)
+      : 0
+  const scanning = Boolean(catchUpInFlight) || lastProgress.scanning
+  const caughtUp = Number.isFinite(lastHeight) && Number.isFinite(tip) && lastHeight >= tip
+
+  return {
+    scanning,
+    caughtUp,
+    lastHeight,
+    tip,
+    from: state.from,
+    count: records.length,
+    updatedAt: state.updatedAt,
+    startHeight,
+    addedThisRun: lastProgress.addedThisRun || 0,
+    remaining,
+    percent: caughtUp || remaining === 0
+      ? 100
+      : Math.min(100, (catchUpDone / catchUpSpan) * 100),
+    error: lastProgress.error,
+  }
+}
+
+function emitProgress(partial = {}) {
+  lastProgress = {
+    ...lastProgress,
+    ...partial,
+    scanning: partial.scanning ?? Boolean(catchUpInFlight),
+  }
+  emitWindow(PROGRESS_EVENT, getImmutablesProgress())
+}
+
+export function subscribeImmutablesProgress(onProgress) {
+  if (typeof window === 'undefined') return () => {}
+  const notify = (event) => onProgress(event?.detail || getImmutablesProgress())
+  onProgress(getImmutablesProgress())
+  window.addEventListener(PROGRESS_EVENT, notify)
+  window.addEventListener('theblocknote:immutables', notify)
+  return () => {
+    window.removeEventListener(PROGRESS_EVENT, notify)
+    window.removeEventListener('theblocknote:immutables', notify)
+  }
 }
 
 function startCatchUp(lastHeight) {
   if (catchUpInFlight) return catchUpInFlight
+
+  lastProgress = {
+    scanning: true,
+    startHeight: lastHeight,
+    tip: lastProgress.tip,
+    addedThisRun: 0,
+    error: null,
+  }
+  emitProgress({ scanning: true, startHeight: lastHeight, addedThisRun: 0, error: null })
 
   catchUpInFlight = (async () => {
     const { extra, tip, lastHeight: scannedTo } = await catchUpImmutables(lastHeight, {
@@ -137,6 +215,13 @@ function startCatchUp(lastHeight) {
           count: records.length,
           updatedAt: new Date().toISOString(),
         })
+        lastProgress.addedThisRun += added.length
+        emitProgress({
+          scanning: true,
+          tip: chainTip,
+          lastHeight: height,
+          addedThisRun: lastProgress.addedThisRun,
+        })
       },
     })
 
@@ -149,14 +234,28 @@ function startCatchUp(lastHeight) {
       count: records.length,
       updatedAt: new Date().toISOString(),
     })
+    emitProgress({
+      scanning: false,
+      tip: tip || lastProgress.tip,
+      addedThisRun: extra.length,
+      error: null,
+    })
     if ((scannedTo ?? lastHeight) !== lastHeight || extra.length) {
       emitImmutablesUpdated()
     }
     return records
   })()
-    .catch(() => readStoredRecords())
+    .catch((error) => {
+      emitProgress({
+        scanning: false,
+        error: error?.message || 'Catch-up failed',
+      })
+      return readStoredRecords()
+    })
     .finally(() => {
       catchUpInFlight = null
+      lastProgress.scanning = false
+      emitProgress({ scanning: false })
     })
 
   return catchUpInFlight

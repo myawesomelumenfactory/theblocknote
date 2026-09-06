@@ -70,6 +70,12 @@ export default function Header() {
                   <span className="font-medium">Spark</span>
                 </Link>
                 <Link
+                  to="/status"
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300 bg-white-400/20 text-white border border-white/10"
+                >
+                  <span className="font-medium">Status</span>
+                </Link>
+                <Link
                   to="https://bitcoin.org/bitcoin.pdf"
                   target="_blank"
                   className="flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300 bg-white-400/20 text-white border border-white/10"
