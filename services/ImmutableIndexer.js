@@ -546,13 +546,13 @@ Options:
   --until-tip         Keep scanning passes until chain tip or INDEX_DEADLINE_MS
   --blockstream       Same fallback chain (haskoin → mempool.space → others)
 
-Examples:
   npm run index:immutables
-  npm run index:immutables -- --from 906867 --to 910933
-  npm run index:immutables -- --overlap 8
-  npm run index:immutables -- --overlap 8 --max-blocks 800 --until-tip
-  npm run index:immutables -- --blockstream --until-tip
-  npm run index:immutables -- --from 906867 --all-op-return
+      One-shot, no HTTP server. Resumes the checkpoint, re-scans 8 blocks, writes
+      data/immutables.json and data/immutables-state.json (and the public copies)
+      until chain tip.
+
+  npm run immutables:service
+      Same indexer plus a local status server on :8788 that keeps polling.
 `;
 }
 
