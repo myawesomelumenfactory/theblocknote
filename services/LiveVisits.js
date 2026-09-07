@@ -1,27 +1,6 @@
-const VISIT_KEY = 'theblocknoteLiveVisitId'
+import { LIVE_KIND_COUNT } from '../src/i18n/translations'
 
-const KINDS = [
-  'a human',
-  'a connected device',
-  'a robot',
-  'a smart cat',
-  'a smart dog',
-  'a squirrel',
-  'a toaster with opinions',
-  'a passing comet',
-  'a very small satellite',
-  'an unsigned wallet',
-  'a curious raccoon',
-  'a midnight owl',
-  'a polite crawler',
-  'a whispering modem',
-  'a neighborhood fox',
-  'a lightning bug',
-  'an honest node',
-  'a time-traveling pigeon',
-  'a garden gnome',
-  'a block of cheese',
-]
+const VISIT_KEY = 'theblocknoteLiveVisitId'
 
 function presenceBases() {
   const bases = []
@@ -46,8 +25,13 @@ export function visitId() {
   }
 }
 
+export function randomKindIndex(count = LIVE_KIND_COUNT) {
+  const total = Math.max(1, count)
+  return Math.floor(Math.random() * total)
+}
+
 export function randomKind() {
-  return KINDS[Math.floor(Math.random() * KINDS.length)]
+  return randomKindIndex()
 }
 
 export async function sendHeartbeat() {

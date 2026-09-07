@@ -4,8 +4,10 @@ import { motion } from "framer-motion";
 import GlassCard from "../components/GlassCard";
 import Transactions from '../components/Transactions'
 import { Activity } from "lucide-react";
+import { useLanguage } from "../src/i18n/LanguageContext";
 
 export default function LatestMessages() {
+  const { t } = useLanguage();
   return (
     <motion.div 
         initial={{ opacity: 0, y: 20, scale: 0.95 }}
@@ -20,7 +22,7 @@ export default function LatestMessages() {
     {<GlassCard className="p-8 mb-8 max-w-5xl mx-auto">
         <div className="flex items-center gap-3 mb-6">
             <Activity className="w-6 h-6 text-blue-400" />
-            <h2 className="text-2xl font-bold text-white">Latest Messages</h2>
+            <h2 className="text-2xl font-bold text-white">{t('messages.title')}</h2>
         </div>
 
         <Transactions />

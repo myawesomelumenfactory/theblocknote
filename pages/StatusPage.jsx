@@ -9,9 +9,10 @@ import {
 import { applyChainTip, refreshChainTip, useChainTip } from '../services/ChainTipStore'
 import { mempoolTipHeight } from '../services/ImmutableLiveFill'
 import immutablesData, { immutablesState } from 'virtual:immutables'
+import { useLanguage } from '../src/i18n/LanguageContext'
 
-function formatHeight(value) {
-  return Number.isFinite(value) ? value.toLocaleString('en-US') : '—'
+function formatHeight(value, locale) {
+  return Number.isFinite(value) ? value.toLocaleString(locale) : '—'
 }
 
 function formatTime(value) {
@@ -23,6 +24,7 @@ function formatTime(value) {
 
 export default function StatusPage() {
   const chainTip = useChainTip()
+  const { t, locale } = useLanguage()
   const [progress, setProgress] = useState(() => getImmutablesProgress())
 
   useEffect(() => {
@@ -82,12 +84,12 @@ export default function StatusPage() {
     : Math.min(100, (catchUpDone / catchUpSpan) * 100)
 
   const label = progress.error
-    ? 'Catch-up paused'
+    ? t('status.paused')
     : progress.scanning
-      ? 'Catching up from mempool'
+      ? t('status.catchingUp')
       : caughtUp
-        ? 'Caught up with the chain tip'
-        : 'Checking the chain tip'
+        ? t('status.caughtUp')
+        : t('status.checking')
 
   const chainTipHref = Number.isFinite(chainTip)
     ? `https://mempool.space/block/${chainTip}`
@@ -98,7 +100,7 @@ export default function StatusPage() {
         <GlassCard className="max-w-3xl mx-auto p-6 md:p-8">
           <div className="flex items-start justify-between gap-4 mb-6">
             <div>
-              <h2 className="text-2xl font-bold text-white">Immutables</h2>
+              <h2 className="text-2xl font-bold text-white">{t('status.title')}</h2>
               <p className="text-white/60 mt-1">{label}</p>
             </div>
             <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
@@ -113,33 +115,36 @@ export default function StatusPage() {
             />
           </div>
           <p className="text-sm text-white/50 tabular-nums mb-8">
-            {percent.toFixed(1)}% of this catch-up
-            {Number.isFinite(remaining) ? ` · ${formatHeight(remaining)} block${remaining === 1 ? '' : 's'} remaining` : ''}
+            {t('status.percent', { percent: percent.toFixed(1) })}
+            {Number.isFinite(remaining)
+              ? ` · ${t(remaining === 1 ? 'status.remaining' : 'status.remainingPlural', { count: formatHeight(remaining, locale) })}`
+              : ''}
           </p>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Stat label="Indexed height" value={formatHeight(lastHeight)} />
+            <Stat label={t('status.indexedHeight')} value={formatHeight(lastHeight, locale)} />
             <Stat
-              label="Chain tip"
-              value={formatHeight(chainTip)}
+              label={t('status.chainTip')}
+              value={formatHeight(chainTip, locale)}
               href={chainTipHref}
+              title={t('status.latestBlock')}
             />
-            <Stat label="Messages" value={formatHeight(progress.count)} />
-            <Stat label="Found this pass" value={formatHeight(progress.addedThisRun)} />
+            <Stat label={t('status.messages')} value={formatHeight(progress.count, locale)} />
+            <Stat label={t('status.foundThisPass')} value={formatHeight(progress.addedThisRun, locale)} />
           </div>
 
           <dl className="mt-8 space-y-3 text-sm">
-            <Row label="Baked snapshot" value={`block ${formatHeight(immutablesState?.lastHeight)} · ${formatHeight(immutablesState?.count)} messages`} />
-            <Row label="localStorage" value={progress.scanning ? 'Updating from mempool.space' : 'Holding the live snapshot'} />
-            <Row label="Last updated" value={formatTime(progress.updatedAt)} />
-            {progress.error ? <Row label="Error" value={progress.error} /> : null}
+            <Row label={t('status.baked')} value={t('status.bakedValue', { height: formatHeight(immutablesState?.lastHeight, locale), count: formatHeight(immutablesState?.count, locale) })} />
+            <Row label={t('status.storage')} value={progress.scanning ? t('status.storageUpdating') : t('status.storageHolding')} />
+            <Row label={t('status.lastUpdated')} value={formatTime(progress.updatedAt)} />
+            {progress.error ? <Row label={t('status.error')} value={progress.error} /> : null}
           </dl>
         </GlassCard>
       </div>
   )
 }
 
-function Stat({ label, value, href }) {
+function Stat({ label, value, href, title }) {
   const number = (
     <div className="text-xl md:text-2xl font-semibold text-white tabular-nums mt-1">{value}</div>
   )
@@ -151,7 +156,7 @@ function Stat({ label, value, href }) {
           href={href}
           target="_blank"
           rel="noopener noreferrer"
-          title="Latest Bitcoin block on mempool.space"
+          title={title}
           className="hover:text-orange-300"
         >
           {number}

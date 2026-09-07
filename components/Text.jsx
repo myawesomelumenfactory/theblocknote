@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { Type, AlertCircle } from "lucide-react";
 import { useEffect } from 'react';
+import { useLanguage } from '../src/i18n/LanguageContext';
 
 export default function Text({ 
   value, 
@@ -10,6 +11,7 @@ export default function Text({
   maxLength = 80,
   className = ""
 }) {
+  const { t } = useLanguage();
   const [isFocused, setIsFocused] = useState(false);
   const [placeholder, setPlaceholder] = useState("");
   
@@ -22,7 +24,7 @@ export default function Text({
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           maxLength={maxLength}
-          placeholder="Enter any address"
+          placeholder={t('read.placeholder')}
           className={`
             w-full h-32 pl-12 pr-4 py-4 
             backdrop-blur-xl bg-white-900/10 rounded-2xl border border-white/20

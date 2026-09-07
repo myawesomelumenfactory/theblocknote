@@ -2,8 +2,10 @@
 import React, { useEffect, useState } from 'react';
 import { Bitcoin } from "lucide-react";
 import Badge from '../components/Badge';
+import { useLanguage } from '../src/i18n/LanguageContext';
 
 export default function Transactions() {
+    const { t } = useLanguage();
     const [transactions, setTransactions] = useState([]);
 
     useEffect(() => {
@@ -94,7 +96,7 @@ export default function Transactions() {
                 <div className="text-right">
                     <Badge
                         color={tx.confirmed === 0 ? 'red' : 'green'}
-                        text={tx.confirmed === 0 ? 'Unconfirmed' : 'Confirmed'}
+                        text={tx.confirmed === 0 ? t('utxo.unconfirmed') : t('utxo.confirmed')}
                     />
                     <div className="text-sm text-white/60">
                     Jul 18, 11:20

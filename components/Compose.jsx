@@ -5,11 +5,13 @@ import TextInput from '../components/TextInput';
 import EmbedButton from '../components/EmbedButton';
 import { SharedContext } from '../src/SharedContext';
 import { getHighestFundedUnit, sendBitcoinTransaction, validateUTXO } from '../services/BitcoinService';
+import { useLanguage } from '../src/i18n/LanguageContext';
 
 export default function Compose() {
   const [message, setMessage] = useState("");
   const fee = 450;
   const { refs, setCurrentIndex, ensureUtxoHex } = useContext(SharedContext);
+  const { t } = useLanguage();
 
   const [isLoading, setIsLoading] = useState(false);
   const [isEmbedded, setIsEmbedded] = useState(false);
@@ -21,13 +23,13 @@ export default function Compose() {
 
   const handleSubmit = async () => {
     if (!message.trim()) {
-      setError("Please enter a message");
+      setError(t('compose.enterMessage'));
       return;
     }
 
     const selectedUnit = getHighestFundedUnit(refs, fee);
     if (!selectedUnit) {
-      setError("No funded unit available");
+      setError(t('compose.noFundedUnit'));
       return;
     }
 
@@ -64,7 +66,7 @@ export default function Compose() {
       }
     } catch (err) {
       console.error('Transaction error:', err);
-      setError(err.message || 'An unexpected error occurred');
+      setError(err.message || t('compose.unexpected'));
     } finally {
       setIsLoading(false);
     }
@@ -74,7 +76,7 @@ export default function Compose() {
     <div>
       <div className="flex items-center gap-3 mb-6">
         <Activity className="w-6 h-6 text-blue-400" />
-        <h2 className="text-2xl font-bold text-white">Speak about your truth</h2>
+        <h2 className="text-2xl font-bold text-white">{t('compose.title')}</h2>
       </div>
 
       <div className="gap-3 mb-6">
@@ -88,7 +90,7 @@ export default function Compose() {
 
       {error && (
         <div className="p-4 mb-4 text-md text-red-800 rounded-lg bg-red-50 dark:bg-red-900/20 dark:text-red-300" role="alert">
-          <span className="font-bold">Error:</span> {error}
+          <span className="font-bold">{t('compose.error')}</span> {error}
         </div>
       )}
 
@@ -97,11 +99,12 @@ export default function Compose() {
           onClick={handleSubmit}
           disabled={!hasFundedUnit || !message.trim()}
           isLoading={isLoading}
+          text={t('compose.send')}
         />
       </div>
       {!hasFundedUnit && (
         <p className="text-white/50 text-sm mb-6">
-          Send is unavailable until a funded unit is loaded on Spark.
+          {t('compose.noUnit')}
         </p>
       )}
 
@@ -115,7 +118,12 @@ export default function Compose() {
                 rel="noopener noreferrer"
                 className="text-white-600 hover:text-white-800/20"
               >
-                Your voice matters.<br />Don't Trust. Verify.
+                {t('compose.success').split('\n').map((line, index) => (
+                  <span key={line}>
+                    {index > 0 ? <br /> : null}
+                    {line}
+                  </span>
+                ))}
               </a>
             </center>
           </span>

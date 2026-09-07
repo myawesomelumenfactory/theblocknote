@@ -17,6 +17,7 @@ import {
     clearStoredKeyPairs,
 } from '../services/ParticipationKeys';
 import { windowMotion } from '../services/introMotion';
+import { useLanguage } from '../src/i18n/LanguageContext';
 
 async function copyText(value) {
     if (navigator.clipboard?.writeText) {
@@ -36,8 +37,8 @@ async function copyText(value) {
 
 const PAGE_SIZE = 3;
 
-function formatSats(sats) {
-    return new Intl.NumberFormat('en-US').format(sats || 0);
+function formatSats(sats, locale = 'en-US') {
+    return new Intl.NumberFormat(locale).format(sats || 0);
 }
 
 function formatBtc(sats) {
@@ -55,6 +56,7 @@ export default function Load() {
     const [page, setPage] = useState(0);
     const [confirmingClear, setConfirmingClear] = useState(false);
     const { refs, setCurrentIndex, addressFunds, fundsProgress, refreshRefs, ensureUtxoHex } = useContext(SharedContext);
+    const { t, locale } = useLanguage();
 
     const applyKeys = (keyPairs, preferredAddress) => {
         writeStoredKeyPairs(keyPairs);
@@ -169,7 +171,7 @@ export default function Load() {
             applyKeys(merged, importedAddress);
             window.location.reload();
         } catch (error) {
-            setImportError(error.message || 'Could not import those participation keys');
+            setImportError(error.message || t('spark.importFailed'));
         }
     };
 
@@ -191,9 +193,9 @@ export default function Load() {
         ? Math.min(100, Math.round((fundsProgress.checked / Math.max(fundsProgress.total, 1)) * 100))
         : 0;
     const progressLabel = fundsProgress?.phase === 'keys'
-        ? `Checking keys ${fundsProgress.checked} / ${fundsProgress.total}`
+        ? t('spark.checkingKeys', { checked: fundsProgress.checked, total: fundsProgress.total })
         : fundsProgress?.phase === 'units'
-        ? `Loading funded units ${fundsProgress.checked} / ${fundsProgress.total}`
+        ? t('spark.loadingUnits', { checked: fundsProgress.checked, total: fundsProgress.total })
         : '';
     const fundedKeyPairs = Object.fromEntries(
         fundedAddresses.map((addr) => [addr, savedKeys[addr]])
@@ -219,8 +221,8 @@ export default function Load() {
 
         <div className="flex items-center gap-3 mb-6">
             <Activity className="w-6 h-6 text-orange-400" />
-            <h2 className="text-2xl font-bold text-white">Load bitcoins (units) 
-            <span className="text-sm"> (min 0.00001 BTC)</span>
+            <h2 className="text-2xl font-bold text-white">{t('spark.loadTitle')} 
+            <span className="text-sm"> {t('spark.minAmount')}</span>
             </h2>
         </div>
 
@@ -233,14 +235,14 @@ export default function Load() {
         )}
         {address && (
             <p className="text-center text-white/50 text-sm mb-6">
-                Watching for incoming bitcoin. Funded keys appear here automatically.
+                {t('spark.watching')}
             </p>
         )}
 
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
             <div className="flex items-center gap-3">
                 <Activity className="w-6 h-6 text-blue-400" />
-                <h2 className="text-2xl font-bold text-white">Participation Keys</h2>
+                <h2 className="text-2xl font-bold text-white">{t('spark.keysTitle')}</h2>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
                 {fundedAddresses.length > 0 && (
@@ -251,7 +253,7 @@ export default function Load() {
                     >
                         {copied === 'all' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                         <span className="text-sm font-medium">
-                            {copied === 'all' ? 'Copied all keys' : 'Copy all keys'}
+                            {copied === 'all' ? t('spark.copiedAll') : t('spark.copyAll')}
                         </span>
                     </button>
                 )}
@@ -262,13 +264,13 @@ export default function Load() {
                         className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-red-500/15 text-red-200 border border-red-400/30 hover:bg-red-500/25 transition-all duration-300"
                     >
                         <Trash2 className="w-4 h-4" />
-                        <span className="text-sm font-medium">Clear all keys</span>
+                        <span className="text-sm font-medium">{t('spark.clearAll')}</span>
                     </button>
                 )}
                 {confirmingClear && (
                     <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                         <span className="text-sm text-orange-200">
-                            Remove every participation key from this browser?
+                            {t('spark.clearConfirm')}
                         </span>
                         <div className="flex items-center gap-2">
                             <button
@@ -276,7 +278,7 @@ export default function Load() {
                                 onClick={() => setConfirmingClear(false)}
                                 className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-white/10 text-white border border-white/10 hover:bg-white/20 transition-all duration-300"
                             >
-                                <span className="text-sm font-medium">Cancel</span>
+                                <span className="text-sm font-medium">{t('spark.cancel')}</span>
                             </button>
                             <button
                                 type="button"
@@ -284,7 +286,7 @@ export default function Load() {
                                 className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-red-500/80 text-white border border-red-300/40 hover:bg-red-500 transition-all duration-300"
                             >
                                 <Trash2 className="w-4 h-4" />
-                                <span className="text-sm font-medium">Clear keys</span>
+                                <span className="text-sm font-medium">{t('spark.clearKeys')}</span>
                             </button>
                         </div>
                     </div>
@@ -293,14 +295,14 @@ export default function Load() {
         </div>
 
         <p className="text-white/60 text-sm mb-6">
-            Copy these keys to reuse them in another browser. The copied text includes the private key, so anyone who has it can spend the coins on that address.
+            {t('spark.copyHint')}
         </p>
 
         {isLoadingFunds && fundsProgress.total > 0 && (
             <div className="mb-6">
                 <div className="flex justify-between gap-3 text-sm text-white/70 mb-2">
                     <span>{progressLabel}</span>
-                    <span>{fundsProgress.funded} funded</span>
+                    <span>{t('spark.fundedCount', { count: fundsProgress.funded })}</span>
                 </div>
                 <div className="h-2 rounded-full bg-white/10 overflow-hidden">
                     <div
@@ -323,27 +325,27 @@ export default function Load() {
                     <div key={savedAddress} className="glass-panel rounded-3xl p-5 border border-white/10 bg-white/5">
                         <div className="flex items-start justify-between gap-3 mb-4">
                             <div>
-                                <div className="text-gray-400 text-xs mb-1">Address</div>
+                                <div className="text-gray-400 text-xs mb-1">{t('spark.address')}</div>
                                 <div className="text-white text-sm font-mono break-all">{savedAddress}</div>
                             </div>
                             {funds.pending && (
                                 <span className="shrink-0 px-3 py-1 rounded-full text-xs font-semibold bg-orange-500/20 text-orange-300 border border-orange-400/30">
-                                    Unconfirmed
+                                    {t('spark.unconfirmed')}
                                 </span>
                             )}
                         </div>
                         <div className="mb-4">
-                            <div className="text-gray-400 text-xs mb-1">Amount sent</div>
+                            <div className="text-gray-400 text-xs mb-1">{t('spark.amountSent')}</div>
                             <div className="text-2xl font-bold text-white">
-                                {formatSats(funds.received)} SATS
+                                {formatSats(funds.received, locale)} SATS
                             </div>
                             <div className="text-gray-400 text-sm">
                                 ≈ {formatBtc(funds.received)} BTC
-                                {funds.unconfirmed > 0 ? ` · ${formatSats(funds.unconfirmed)} sats unconfirmed` : ''}
-                                {funds.available !== funds.received ? ` · ${formatSats(funds.available)} sats available` : ''}
+                                {funds.unconfirmed > 0 ? ` · ${t('spark.satsUnconfirmed', { amount: formatSats(funds.unconfirmed, locale) })}` : ''}
+                                {funds.available !== funds.received ? ` · ${t('spark.satsAvailable', { amount: formatSats(funds.available, locale) })}` : ''}
                             </div>
                         </div>
-                        <div className="text-gray-400 text-xs mb-1">Private key</div>
+                        <div className="text-gray-400 text-xs mb-1">{t('spark.privateKey')}</div>
                         <div className="text-white/80 text-sm font-mono break-all mb-4">
                             {revealed[savedAddress] ? savedKeys[savedAddress] : '••••••••••••••••••••••••••••••••'}
                         </div>
@@ -354,7 +356,7 @@ export default function Load() {
                                 className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 text-white border border-white/10 hover:bg-white/20 transition-all duration-300"
                             >
                                 {revealed[savedAddress] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                <span className="text-sm">{revealed[savedAddress] ? 'Hide' : 'Show'}</span>
+                                <span className="text-sm">{revealed[savedAddress] ? t('spark.hide') : t('spark.show')}</span>
                             </button>
                             <button
                                 type="button"
@@ -362,7 +364,7 @@ export default function Load() {
                                 className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 text-white border border-white/10 hover:bg-white/20 transition-all duration-300"
                             >
                                 {copied === savedAddress ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                                <span className="text-sm">{copied === savedAddress ? 'Copied' : 'Copy this key'}</span>
+                                <span className="text-sm">{copied === savedAddress ? t('spark.copied') : t('spark.copyThisKey')}</span>
                             </button>
                         </div>
                     </div>
@@ -382,7 +384,7 @@ export default function Load() {
                         }`}
                     >
                         <ChevronLeft className="w-4 h-4" />
-                        <span className="text-sm">Previous</span>
+                        <span className="text-sm">{t('spark.previous')}</span>
                     </button>
                     <span className="text-white/70 text-sm">
                         {currentPage + 1} / {totalPages}
@@ -397,7 +399,7 @@ export default function Load() {
                                 : 'bg-white/10 text-white border-white/10 hover:bg-white/20 cursor-pointer'
                         }`}
                     >
-                        <span className="text-sm">Next</span>
+                        <span className="text-sm">{t('spark.next')}</span>
                         <ChevronRight className="w-4 h-4" />
                     </button>
                 </div>
@@ -407,26 +409,26 @@ export default function Load() {
 
         {fundedAddresses.length === 0 && stillChecking && (
             <div className="glass-panel rounded-3xl p-8 max-w-md mx-auto mb-8 text-center">
-                <div className="text-white/80 text-lg mb-2">Looking up funded keys…</div>
+                <div className="text-white/80 text-lg mb-2">{t('spark.lookingUp')}</div>
                 <div className="text-white/50 text-sm">
-                    {progressLabel || 'Checking the chain for bitcoin sent to your participation keys.'}
+                    {progressLabel || t('spark.checkingChain')}
                 </div>
             </div>
         )}
 
         {fundedAddresses.length === 0 && !stillChecking && (
             <div className="glass-panel rounded-3xl p-8 max-w-md mx-auto mb-8 text-center">
-                <div className="text-white/80 text-lg mb-2">No funded participation keys</div>
+                <div className="text-white/80 text-lg mb-2">{t('spark.noFundedKeys')}</div>
                 <div className="text-white/50 text-sm">
-                    Keys with 0 SATS are hidden. Send bitcoin to the QR address, then this list will show that key.
+                    {t('spark.keysHidden')}
                 </div>
             </div>
         )}
 
         <div className="mb-10">
-            <h3 className="text-lg font-semibold text-white mb-2">Import keys from another browser</h3>
+            <h3 className="text-lg font-semibold text-white mb-2">{t('spark.importTitle')}</h3>
             <p className="text-white/60 text-sm mb-4">
-                Paste a copied participation key bundle here. Those keys will be saved in this browser and any funded units will show below.
+                {t('spark.importHint')}
             </p>
             <textarea
                 value={importText}
@@ -444,18 +446,18 @@ export default function Load() {
                         : 'bg-gray-200/12 text-gray-200 border-white/10 cursor-not-allowed'
                 }`}
             >
-                Import participation keys
+                {t('spark.importButton')}
             </button>
             {importError && (
                 <div className="mt-4 p-4 text-md text-red-800 rounded-lg bg-red-50 dark:bg-red-900/20 dark:text-red-300" role="alert">
-                    <span className="font-bold">Error:</span> {importError}
+                    <span className="font-bold">{t('spark.error')}</span> {importError}
                 </div>
             )}
         </div>
    
         <div className="flex items-center gap-3 mb-6">
             <Activity className="w-6 h-6 text-blue-400" />
-            <h2 className="text-2xl font-bold text-white">Funded units</h2>
+            <h2 className="text-2xl font-bold text-white">{t('spark.fundedUnits')}</h2>
         </div>
 
         {participationUnits.length > 0 && (
@@ -491,9 +493,9 @@ export default function Load() {
             className="text-center py-16"
             >
             <div className="glass-panel rounded-3xl p-8 max-w-md mx-auto">
-                <div className="text-black-400 text-lg mb-2">No funded units yet</div>
+                <div className="text-black-400 text-lg mb-2">{t('spark.noUnits')}</div>
                 <div className="text-black-500 text-sm">
-                Send bitcoin to the QR address, or import keys that already have funds. Those units will appear here.
+                {t('spark.noUnitsHint')}
                 </div>
             </div>
             </motion.div>

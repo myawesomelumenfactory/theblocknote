@@ -8,14 +8,9 @@ import { appendImmutable, loadImmutableRecords } from '../services/ImmutablesSto
 import immutablesData, { immutablesState } from 'virtual:immutables';
 import { SharedContext } from '../src/SharedContext';
 import { windowMotion } from '../services/introMotion';
+import { useLanguage } from '../src/i18n/LanguageContext';
 
 const PAGE_SIZE = 5;
-
-const SORT_MODES = [
-  { id: 'latest', label: 'Latest', title: 'Newest messages first' },
-  { id: 'up', label: 'Up', title: 'Most up votes first' },
-  { id: 'down', label: 'Down', title: 'Messages with down votes' },
-];
 
 export default function LatestMessagesBlocks() {
 
@@ -30,7 +25,13 @@ export default function LatestMessagesBlocks() {
   const [loading, setLoading] = useState(true);
   const [sortMode, setSortMode] = useState('latest');
   const { refs, ensureUtxoHex, refreshRefs } = useContext(SharedContext);
+  const { t } = useLanguage();
   const hasFundedUnit = Boolean(getHighestFundedUnit(Array.isArray(refs) ? refs : [], 450));
+  const sortModes = [
+    { id: 'latest', label: t('messages.latest'), title: t('messages.latestTitle') },
+    { id: 'up', label: t('messages.up'), title: t('messages.upTitle') },
+    { id: 'down', label: t('messages.down'), title: t('messages.downTitle') },
+  ];
 
   function formatTimestampToUTC(timestampInSeconds) {
     const date = new Date(timestampInSeconds * 1000); // convert seconds to ms
@@ -66,7 +67,7 @@ export default function LatestMessagesBlocks() {
   const handleVote = async (messageIndex, direction) => {
     const selectedUnit = getHighestFundedUnit(Array.isArray(refs) ? refs : [], 450);
     if (!selectedUnit) {
-      setVoteNotice({ type: 'error', text: 'Load a funded unit on Spark before voting.' });
+      setVoteNotice({ type: 'error', text: t('messages.voteBefore') });
       return;
     }
 
@@ -83,7 +84,7 @@ export default function LatestMessagesBlocks() {
         : await applyVoteDown(utxo, hash, vout, 450);
 
       if (!result.success) {
-        setVoteNotice({ type: 'error', text: result.error || 'The vote could not be sent.' });
+        setVoteNotice({ type: 'error', text: result.error || t('messages.voteFailed') });
         return;
       }
 
@@ -114,14 +115,14 @@ export default function LatestMessagesBlocks() {
       setOpenVoteLists((prev) => new Set([...prev, messageIndex]));
       setVoteNotice({
         type: 'success',
-        text: direction === 'up' ? 'Up vote recorded on the blockchain.' : 'Down vote recorded on the blockchain.',
+        text: direction === 'up' ? t('messages.upRecorded') : t('messages.downRecorded'),
         url: result.explorerUrl,
       });
       if (refreshRefs) {
         await refreshRefs({ watch: true, address: selectedUnit.public_key });
       }
     } catch (error) {
-      setVoteNotice({ type: 'error', text: error.message || 'The vote could not be sent.' });
+      setVoteNotice({ type: 'error', text: error.message || t('messages.voteFailed') });
     } finally {
       setVotingIndex(null);
     }
@@ -446,14 +447,14 @@ export default function LatestMessagesBlocks() {
       <div className="flex items-start justify-between gap-3 mb-6">
           <div className="flex items-center gap-3 min-w-0">
             <Activity className="w-6 h-6 text-blue-400 shrink-0" />
-            <h2 className="text-2xl font-bold text-white">Latest Messages</h2>
+            <h2 className="text-2xl font-bold text-white">{t('messages.title')}</h2>
           </div>
           <div
             role="group"
-            aria-label="Filter messages"
+            aria-label={t('messages.filter')}
             className="flex shrink-0 items-center rounded-full border border-white/10 bg-white/5 p-0.5"
           >
-            {SORT_MODES.map((mode) => {
+            {sortModes.map((mode) => {
               const active = sortMode === mode.id;
               return (
                 <button
@@ -494,7 +495,7 @@ export default function LatestMessagesBlocks() {
                 rel="noopener noreferrer"
                 className="underline text-white/80 hover:text-white"
               >
-                Verify
+                {t('messages.verify')}
               </a>
             </>
           )}
@@ -502,12 +503,12 @@ export default function LatestMessagesBlocks() {
       )}
       {voteNotice?.type === 'error' && (
         <div className="p-4 mb-4 text-md text-red-800 rounded-lg bg-red-50 dark:bg-red-900/20 dark:text-red-300" role="alert">
-          <span className="font-bold">Error:</span> {voteNotice.text}
+          <span className="font-bold">{t('messages.error')}</span> {voteNotice.text}
         </div>
       )}
       {!hasFundedUnit && !loading && (
         <p className="text-white/50 text-sm mb-4">
-          Voting needs a funded unit from Spark.
+          {t('messages.needUnit')}
         </p>
       )}
 
@@ -518,18 +519,18 @@ export default function LatestMessagesBlocks() {
           aria-live="polite"
         >
           <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
-          <span className="text-white/60 text-sm">Loading messages…</span>
+          <span className="text-white/60 text-sm">{t('messages.loading')}</span>
         </div>
       ) : (
       <div>
       {pagedMessages.length === 0 ? (
         <p className="text-white/50 text-sm py-8 text-center">
-          {sortMode === 'down' ? 'No down votes yet.' : 'No messages yet.'}
+          {sortMode === 'down' ? t('messages.noDowns') : t('messages.none')}
         </p>
       ) : null}
       <ul>
-        {pagedMessages.map((t, index) => {
-          const txid = voteTxidFromIndex(t.index);
+        {pagedMessages.map((msg, index) => {
+          const txid = voteTxidFromIndex(msg.index);
           const txUrl = explorerTxUrl(txid);
           return (
           <motion.div 
@@ -539,25 +540,25 @@ export default function LatestMessagesBlocks() {
             ease: [0.4, 0, 0.2, 1]
           })}
           className="mb-4"
-          key={t.index}
+          key={msg.index}
           >
           {<GlassCard className="p-5">
             <div className="space-y-4">
               {/* Message Content */}
               <div>
-                <p className="text-white text-lg mb-2">{t.value}</p>
+                <p className="text-white text-lg mb-2">{msg.value}</p>
                 {txUrl ? (
                     <a
                       href={txUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      title="View this transaction on mempool.space"
+                      title={t('messages.viewTx')}
                       className="text-white/30 text-sm hover:text-white/60"
                     >
-                      {formatTimestampToUTC(t.time)}
+                      {formatTimestampToUTC(msg.time)}
                     </a>
                 ) : (
-                  <p className="text-white/30 text-sm">{formatTimestampToUTC(t.time)}</p>
+                  <p className="text-white/30 text-sm">{formatTimestampToUTC(msg.time)}</p>
                 )}
               </div>
               
@@ -566,70 +567,70 @@ export default function LatestMessagesBlocks() {
                 {/* Vote Up Button */}
                 <button
                   type="button"
-                  onClick={() => handleVoteUp(t.index)}
-                  disabled={!hasFundedUnit || votingIndex === t.index}
-                  title={!hasFundedUnit ? 'Load a funded unit on Spark to vote' : 'Vote up'}
+                  onClick={() => handleVoteUp(msg.index)}
+                  disabled={!hasFundedUnit || votingIndex === msg.index}
+                  title={!hasFundedUnit ? t('messages.loadToVote') : t('messages.voteUp')}
                   className={`
                     flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200
-                    ${!hasFundedUnit || votingIndex === t.index
+                    ${!hasFundedUnit || votingIndex === msg.index
                       ? 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
                       : 'bg-white/10 text-white hover:bg-green-500/20 hover:text-green-400 hover:scale-105'
                     }
                   `}
                 >
                   <ChevronUp className="w-4 h-4" />
-                  <span className="text-sm font-medium">{t.ups}</span>
+                  <span className="text-sm font-medium">{msg.ups}</span>
                 </button>
                 
                 {/* Vote Down Button */}
                 <button
                   type="button"
-                  onClick={() => handleVoteDown(t.index)}
-                  disabled={!hasFundedUnit || votingIndex === t.index}
-                  title={!hasFundedUnit ? 'Load a funded unit on Spark to vote' : 'Vote down'}
+                  onClick={() => handleVoteDown(msg.index)}
+                  disabled={!hasFundedUnit || votingIndex === msg.index}
+                  title={!hasFundedUnit ? t('messages.loadToVote') : t('messages.voteDown')}
                   className={`
                     flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200
-                    ${!hasFundedUnit || votingIndex === t.index
+                    ${!hasFundedUnit || votingIndex === msg.index
                       ? 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
                       : 'bg-white/10 text-white hover:bg-red-500/20 hover:text-red-400 hover:scale-105'
                     }
                   `}
                 >
                   <ChevronDown className="w-4 h-4" />
-                  <span className="text-sm font-medium">{t.downs}</span>
+                  <span className="text-sm font-medium">{msg.downs}</span>
                 </button>
               </div>
 
               <div className="pt-1">
                 <button
                   type="button"
-                  onClick={() => toggleVoteList(t.index)}
-                  aria-expanded={openVoteLists.has(t.index)}
+                  onClick={() => toggleVoteList(msg.index)}
+                  aria-expanded={openVoteLists.has(msg.index)}
                   className="flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors"
                 >
                   <List className="w-4 h-4" />
                   <span>
-                    {openVoteLists.has(t.index) ? 'Hide votes' : 'Show votes'}
-                    {` (${(t.votes || []).length})`}
+                    {openVoteLists.has(msg.index) ? t('messages.hideVotes') : t('messages.showVotes')}
+                    {` (${(msg.votes || []).length})`}
                   </span>
                   <ChevronDown
-                    className={`w-4 h-4 transition-transform ${openVoteLists.has(t.index) ? 'rotate-180' : ''}`}
+                    className={`w-4 h-4 transition-transform ${openVoteLists.has(msg.index) ? 'rotate-180' : ''}`}
                   />
                 </button>
 
-                {openVoteLists.has(t.index) && (
+                {openVoteLists.has(msg.index) && (
                   <ul className="mt-3 space-y-2">
-                    {(t.votes || []).length === 0 ? (
-                      <li className="text-white/40 text-sm">No votes on chain yet.</li>
+                    {(msg.votes || []).length === 0 ? (
+                      <li className="text-white/40 text-sm">{t('messages.noVotes')}</li>
                     ) : (
-                      (t.votes || []).map((vote) => (
+                      (msg.votes || []).map((vote) => (
                         <li
                           key={`${vote.txid}-${vote.direction}-${vote.time}`}
                           className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2"
                         >
                           <div className="flex items-center justify-between gap-3 mb-1">
                             <span className={`text-xs font-medium ${vote.direction === 'up' ? 'text-green-400' : 'text-red-400'}`}>
-                              {vote.direction === 'up' ? 'Up vote' : 'Down vote'}
+                              {vote.direction === 'up' ? t('messages.upVote') : t('messages.downVote')}
                             </span>
                             <span className="text-white/40 text-xs">{formatTimestampToUTC(vote.time)}</span>
                           </div>
@@ -667,7 +668,7 @@ export default function LatestMessagesBlocks() {
             }`}
           >
             <ChevronLeft className="w-4 h-4" />
-            <span className="text-sm">Previous</span>
+            <span className="text-sm">{t('messages.previous')}</span>
           </button>
           <span className="text-white/70 text-sm">
             {currentPage + 1} / {totalPages}
@@ -682,7 +683,7 @@ export default function LatestMessagesBlocks() {
                 : 'bg-white/10 text-white border-white/10 hover:bg-white/20 cursor-pointer'
             }`}
           >
-            <span className="text-sm">Next</span>
+            <span className="text-sm">{t('messages.next')}</span>
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>

@@ -2,36 +2,35 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Type, AlertCircle } from "lucide-react";
-
-const DEFAULT_PLACEHOLDERS = [
-  "Your ideas matter, write them. Forever.",
-  "Freedom of Speech. For all.",
-  "Raise your voice without interruption",
-  "Your opinions has always been valuable",
-  "This area is for everyone and anyone",
-];
+import { useLanguage } from "../src/i18n/LanguageContext";
 
 export default function TextInput({ 
   value, 
   onChange, 
   maxLength = 80,
   fee = 0,
-  placeholderOptions = DEFAULT_PLACEHOLDERS,
+  placeholderOptions,
   className = ""
 }) {
+  const { t, lang } = useLanguage();
+  const placeholders = placeholderOptions || t('compose.placeholders') || [];
   const [isFocused, setIsFocused] = useState(false);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const remainingChars = maxLength - value.length;
-  const placeholder = placeholderOptions[placeholderIndex % placeholderOptions.length] || "";
+  const placeholder = placeholders[placeholderIndex % Math.max(placeholders.length, 1)] || "";
   const showPlaceholder = !value;
+
+  useEffect(() => {
+    setPlaceholderIndex(0);
+  }, [lang]);
 
   useEffect(() => {
     if (value || isFocused) return undefined;
     const tick = window.setInterval(() => {
-      setPlaceholderIndex((current) => (current + 1) % placeholderOptions.length);
+      setPlaceholderIndex((current) => (current + 1) % Math.max(placeholders.length, 1));
     }, 4500);
     return () => window.clearInterval(tick);
-  }, [value, isFocused, placeholderOptions.length]);
+  }, [value, isFocused, placeholders.length]);
 
   return (
     <div className={`relative ${className}`}>
@@ -46,7 +45,7 @@ export default function TextInput({
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           maxLength={maxLength}
-          aria-label={placeholder || "Write your message"}
+          aria-label={placeholder || t('compose.writeMessage')}
           className={`
             w-full h-32 pl-12 pr-4 py-4 
             backdrop-blur-xl bg-white-900/10 rounded-2xl border border-white/20
@@ -93,7 +92,7 @@ export default function TextInput({
             <AlertCircle className="w-4 h-4" />
           )}
           <span className="text-sm font-medium">
-            {remainingChars} / {fee} sats as fee
+            {t('compose.fee', { remaining: remainingChars, fee })}
           </span>
         </motion.div>
       </div>

@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import QRCodeStyling from "qr-code-styling";
+import { useLanguage } from "../src/i18n/LanguageContext";
 
 const SIZE = 640;
 const QRCodeStylingCtor = QRCodeStyling.default || QRCodeStyling;
 
 export default function BitcoinQr({ value }) {
+  const { t } = useLanguage();
   const hostRef = useRef(null);
   const payload = useMemo(() => {
     if (!value) return "";
@@ -46,7 +48,7 @@ export default function BitcoinQr({ value }) {
       <div
         ref={hostRef}
         className="[&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
-        aria-label="Bitcoin payment QR code"
+        aria-label={t('spark.qrLabel')}
       />
     </div>
   );

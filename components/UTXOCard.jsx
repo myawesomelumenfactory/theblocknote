@@ -3,14 +3,16 @@ import { motion } from 'framer-motion';
 import { Check, Hash, Clock, Shield, Tag } from 'lucide-react';
 import { SharedContext } from '../src/SharedContext';
 import { useContext } from 'react';
+import { useLanguage } from '../src/i18n/LanguageContext';
 
 export default function UTXOCard({ utxo, index }) {
 
   const {currentIndex, setCurrentIndex } = useContext(SharedContext);
+  const { t, locale } = useLanguage();
   const confirmations = Number.isFinite(utxo.confirmations) ? utxo.confirmations : (utxo.confirmed ? 1 : 0);
 
   const formatSats = (sats) => {
-    return new Intl.NumberFormat('en-US').format(sats);
+    return new Intl.NumberFormat(locale).format(sats);
   };
 
   const formatTxId = (txId) => {
@@ -64,13 +66,13 @@ export default function UTXOCard({ utxo, index }) {
       {/* Script Type & Output Index */}
       <div className="flex items-center gap-2 mb-4">
         <div className="text-gray-400 text-xs">
-          Output #{index}
+          {t('utxo.output', { index })}
         </div>
       </div>
 
       {/* Address */}
       <div className="mb-4">
-        <div className="text-gray-400 text-xs mb-1">Address</div>
+        <div className="text-gray-400 text-xs mb-1">{t('utxo.address')}</div>
         <div className="text-gray-300 text-sm font-mono">
           <a target="_blank" href={`https://bitaps.com/${utxo.public_key}`}>
             {formatAddress(utxo.public_key)}
@@ -84,15 +86,15 @@ export default function UTXOCard({ utxo, index }) {
           <Clock className={`w-4 h-4 ${getConfirmationColor(confirmations)}`} />
           <span className={`text-sm font-medium ${getConfirmationColor(confirmations)}`}>
             {confirmations === 0
-              ? 'Unconfirmed'
-              : `${confirmations} confirmation${confirmations === 1 ? '' : 's'}`}
+              ? t('utxo.unconfirmed')
+              : t(confirmations === 1 ? 'utxo.confirmation' : 'utxo.confirmations', { count: confirmations })}
           </span>
         </div>
         {utxo.blockHeight ? (
           <div className="flex items-center gap-1">
             <Shield className={`w-4 h-4 ${getConfirmationColor(confirmations)}`} />
             <span className="text-xs text-gray-400">
-              Block {utxo.blockHeight}
+              {t('utxo.block', { height: utxo.blockHeight })}
             </span>
           </div>
         ) : null}

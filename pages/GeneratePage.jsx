@@ -4,9 +4,11 @@ import { motion } from "framer-motion";
 import GlassCard from "../components/GlassCard";
 import { decodeOpReturn } from '../services/TheBlockNote';
 import { windowMotion } from '../services/introMotion';
+import { useLanguage } from '../src/i18n/LanguageContext';
 
 
 const GeneratePage = () => {
+  const { t } = useLanguage();
 
   const fetchTxids = async(from, to) => {
 
@@ -286,7 +288,7 @@ const GeneratePage = () => {
             className="bg-white/20 hover:bg-blue-100 text-black-600 font-semibold py-2 px-4 rounded border-white/50 transition duration-200"
             onClick={onGenerate}
           >
-            Generate
+            {t('generate.button')}
           </button>
 
           </GlassCard>

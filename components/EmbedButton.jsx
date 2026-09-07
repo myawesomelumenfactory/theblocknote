@@ -1,13 +1,16 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { Send, Loader2 } from "lucide-react";
+import { useLanguage } from "../src/i18n/LanguageContext";
 
 export default function EmbedButton({ 
   onClick, 
   disabled = false, 
   isLoading = false,
-  text = "Send"
+  text,
 }) {
+  const { t } = useLanguage();
+  const label = text || t('compose.send');
 
   return (
     <motion.button
@@ -37,12 +40,12 @@ export default function EmbedButton({
         {isLoading ? (
           <>
             <Loader2 className="w-5 h-5 animate-spin" />
-            <span>Embedding your ideas...</span>
+            <span>{t('compose.embedding')}</span>
           </>
         ) : (
           <>
             <Send className="w-5 h-5" />
-            <span>{text}</span>
+            <span>{label}</span>
           </>
         )}
       </div>

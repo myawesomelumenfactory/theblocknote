@@ -4,7 +4,9 @@ import { Menu, X } from "lucide-react";
 import { Link, NavLink } from "react-router-dom";
 import ChainTip from "./ChainTip";
 import BitcoinLogo from "./BitcoinLogo";
+import LanguageSwitcher from "./LanguageSwitcher";
 import { windowMotion } from "../services/introMotion";
+import { useLanguage } from "../src/i18n/LanguageContext";
 
 const navClass = ({ isActive }) =>
   `flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300 border ${
@@ -15,6 +17,7 @@ const navClass = ({ isActive }) =>
 
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { t } = useLanguage();
 
   return (
     <motion.div
@@ -34,8 +37,8 @@ export default function Header() {
               <div className="flex items-center gap-4">
                 <BitcoinLogo className="w-10 h-10 drop-shadow-lg" />
                 <div>
-                  <h1 className="text-xl font-bold text-white">The Block Note : Fully Decentralized Expression Platform for Bitcoin</h1>
-                  <p className="text-sm text-white/50">Raise your voice and vote on consensus.</p>
+                  <h1 className="text-xl font-bold text-white">{t('app.tagline')}</h1>
+                  <p className="text-sm text-white/50">{t('app.subtitle')}</p>
                 </div>
               </div>
 
@@ -44,6 +47,7 @@ export default function Header() {
                 <button
                   onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                   className="text-white"
+                  aria-label={mobileMenuOpen ? t('nav.closeMenu') : t('nav.menu')}
                 >
                   {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
                 </button>
@@ -61,29 +65,30 @@ export default function Header() {
                   onClick={() => setMobileMenuOpen(false)}
                   className={navClass}
                 >
-                  <span className="font-medium">Declare</span>
+                  <span className="font-medium">{t('nav.declare')}</span>
                 </NavLink>
                 <NavLink
                   to="/power"
                   onClick={() => setMobileMenuOpen(false)}
                   className={navClass}
                 >
-                  <span className="font-medium">Spark</span>
+                  <span className="font-medium">{t('nav.spark')}</span>
                 </NavLink>
                 <NavLink
                   to="/status"
                   onClick={() => setMobileMenuOpen(false)}
                   className={navClass}
                 >
-                  <span className="font-medium">Status</span>
+                  <span className="font-medium">{t('nav.status')}</span>
                 </NavLink>
                 <Link
                   to="https://bitcoin.org/bitcoin.pdf"
                   target="_blank"
                   className="flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300 bg-white-400/20 text-white/70 border border-white/10 hover:text-white hover:bg-white/10"
                 >
-                  <span className="font-medium">About</span>
+                  <span className="font-medium">{t('nav.about')}</span>
                 </Link>
+                <LanguageSwitcher onSelect={() => setMobileMenuOpen(false)} />
                 <div className="px-3 py-1 md:py-0">
                   <ChainTip />
                 </div>
