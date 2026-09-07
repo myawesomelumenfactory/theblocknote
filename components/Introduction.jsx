@@ -14,10 +14,10 @@ export default function Introduction() {
   return (
     <div>
 <div className="flex items-center justify-center gap-3 mb-6 text-center">
-        <h1><strong>Bitcoin</strong> is the most subtle form of <strong>Revolution</strong> ever created.</h1>
+        <h1><strong>Bitcoin</strong> is <strong>Revolution</strong>.</h1>
         </div>
         <center>
-            Raise your voice, make it matter and speak freely on the <strong>Bitcoin Decentralized Network.</strong>
+            Raise your voice and vote without any fear or judgement on the <strong>Bitcoin Decentralized Network.</strong>
         </center>
     </div>
   );

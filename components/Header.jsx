@@ -34,8 +34,8 @@ export default function Header() {
               <div className="flex items-center gap-4">
                 <BitcoinLogo className="w-10 h-10 drop-shadow-lg" />
                 <div>
-                  <h1 className="text-xl font-bold text-white">The Block Note</h1>
-                  <p className="text-sm text-white/50">Make Your Voice Heard. Forever.</p>
+                  <h1 className="text-xl font-bold text-white">The Block Note : Fully Decentralized Expression Platform for Bitcoin</h1>
+                  <p className="text-sm text-white/50">Raise your voice and vote on consensus.</p>
                 </div>
               </div>
 
