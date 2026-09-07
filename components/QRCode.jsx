@@ -1,36 +1,53 @@
-import React from "react";
-import { QRCode } from "qrcode.react";
+import React, { useEffect, useMemo, useRef } from "react";
+import QRCodeStyling from "qr-code-styling";
 
-const QRCodeWithLogo = () => {
-  const bitcoinAddress = "bitcoin:1BoatSLRHtKNngkdXEeobR76b53LETtpyT";
+const SIZE = 640;
+const QRCodeStylingCtor = QRCodeStyling.default || QRCodeStyling;
+
+export default function BitcoinQr({ value }) {
+  const hostRef = useRef(null);
+  const payload = useMemo(() => {
+    if (!value) return "";
+    return value.startsWith("bitcoin:") ? value : `bitcoin:${value}`;
+  }, [value]);
+
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host || !payload) return undefined;
+
+    host.innerHTML = "";
+    const qr = new QRCodeStylingCtor({
+      width: SIZE,
+      height: SIZE,
+      type: "svg",
+      data: payload,
+      margin: 12,
+      qrOptions: { errorCorrectionLevel: "H" },
+      dotsOptions: {
+        color: "#000000",
+        type: "square",
+        roundSize: false,
+      },
+      backgroundOptions: {
+        color: "transparent",
+      },
+    });
+    qr.append(host);
+
+    return () => {
+      host.innerHTML = "";
+    };
+  }, [payload]);
+
+  if (!payload) return null;
 
   return (
-    <div style={{ position: "relative", width: 256, height: 256 }}>
-      <QRCode
-        value={bitcoinAddress}
-        size={256}
-        bgColor="#ffffff"
-        fgColor="#000000"
-        level="H" // High error correction level to allow for embedded image
-        includeMargin={true}
-      />
-      <img
-        src="/bitcoin-logo.png"
-        alt="Bitcoin Logo"
-        style={{
-          position: "absolute",
-          top: "50%",
-          left: "50%",
-          width: 64,
-          height: 64,
-          transform: "translate(-50%, -50%)",
-          borderRadius: "120%",
-          backgroundColor: "white", // Optional: improves readability
-          padding: 4
-        }}
+    <div title={payload}>
+      <div
+        ref={hostRef}
+        className="[&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
+        aria-label="Bitcoin payment QR code"
       />
     </div>
   );
-};
-
-export default QRCodeWithLogo;
+}

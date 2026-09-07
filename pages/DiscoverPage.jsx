@@ -1,4 +1,3 @@
-import Header from '../components/Header';
 import React, { useState } from 'react';
 import Text from '../components/Text';
 import { motion } from "framer-motion";
@@ -80,7 +79,6 @@ const DiscoverPage = () => {
 
   return (
     <>
-      <Header/>
     </>
   );
 };

@@ -7,9 +7,11 @@ import ReadPage from '../pages/ReadPage';
 import GeneratePage from '../pages/GeneratePage';
 import StatusPage from '../pages/StatusPage';
 import LiveVisitBeacon from '../components/LiveVisitBeacon';
+import Header from '../components/Header';
 import { SharedContext } from '../src/SharedContext';
 import { fetchBalances, fetchTipHeight, fetchTxHex, fetchUnspents } from '../services/HaskoinStore';
 import { getHighestFundedUnit } from '../services/BitcoinService';
+import { endIntro } from '../services/introMotion';
 
 const CONFIRMED_AFTER = 6;
 
@@ -36,6 +38,10 @@ function App() {
   const keyPairsRef = useRef({});
 
   console.log("--- THE BLOCK NOTE ---");
+
+  useEffect(() => {
+    endIntro();
+  }, []);
 
   useEffect(() => {
     addressFundsRef.current = addressFunds;
@@ -303,6 +309,7 @@ function App() {
         <LiveVisitBeacon onCount={publishLiveCount} />
         <div>
           <div className="h-screen bg-[radial-gradient(circle_at_center,_#3a5ca7_10%,_#1e2a4a_100%,_#0c0f1a_120%)] text-white relative overflow-x-hidden overflow-y-auto pb-50">
+              <Header />
               <Routes>
                 <Route path="/" element={<MainPage />} />
                 <Route path="/power" element={<PowerPage />} />

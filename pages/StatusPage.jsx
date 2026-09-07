@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { Activity } from 'lucide-react'
-import Header from '../components/Header'
 import GlassCard from '../components/GlassCard'
 import {
   getImmutablesProgress,
@@ -95,9 +94,7 @@ export default function StatusPage() {
     : 'https://mempool.space'
 
   return (
-    <>
-      <Header />
-      <div className="w-full px-4 sm:px-6 lg:px-8 pt-4 pb-16">
+    <div className="w-full px-4 sm:px-6 lg:px-8 pt-4 pb-16">
         <GlassCard className="max-w-3xl mx-auto p-6 md:p-8">
           <div className="flex items-start justify-between gap-4 mb-6">
             <div>
@@ -139,7 +136,6 @@ export default function StatusPage() {
           </dl>
         </GlassCard>
       </div>
-    </>
   )
 }
 

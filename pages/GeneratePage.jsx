@@ -1,9 +1,9 @@
 // pages/HomePage.js
-import Header from '../components/Header';
 import React, { useEffect, useState } from 'react';
 import { motion } from "framer-motion";
 import GlassCard from "../components/GlassCard";
 import { decodeOpReturn } from '../services/TheBlockNote';
+import { windowMotion } from '../services/introMotion';
 
 
 const GeneratePage = () => {
@@ -273,15 +273,12 @@ const GeneratePage = () => {
 
   return (
     <>
-        <Header/>
         <motion.div 
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ 
+            {...windowMotion({
             delay: 2,
             duration: 3.2,
-            ease: [0.4, 0, 0.2, 1] // Custom cubic-bezier for smooth, natural motion
-            }}
+            ease: [0.4, 0, 0.2, 1]
+            })}
             className="glass-card rounded-2xl p-6"
         >
           <GlassCard className="p-8 mb-8 max-w-5xl mx-auto">

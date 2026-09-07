@@ -1,4 +1,3 @@
-import Header from '../components/Header';
 import React, { useState } from 'react';
 import Text from '../components/Text';
 import { motion } from "framer-motion";
@@ -80,7 +79,6 @@ const ReadPage = () => {
 
   return (
     <>
-      <Header/>
       <div className='max-w-5xl mx-auto'>
         <Text 
           value={address}

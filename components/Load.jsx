@@ -3,8 +3,8 @@ import { motion } from "framer-motion";
 import GlassCard from "../components/GlassCard";
 import { Activity, Copy, Check, Eye, EyeOff, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 
-import QRCode from "react-qr-code";
 import React, { useEffect, useState, useContext } from 'react';
+import BitcoinQr from "./QRCode";
 import { SharedContext } from '../src/SharedContext';
 import UTXOCard from "./UTXOCard";
 import { AnimatePresence } from 'framer-motion';
@@ -16,6 +16,7 @@ import {
     writeStoredKeyPairs,
     clearStoredKeyPairs,
 } from '../services/ParticipationKeys';
+import { windowMotion } from '../services/introMotion';
 
 async function copyText(value) {
     if (navigator.clipboard?.writeText) {
@@ -207,13 +208,11 @@ export default function Load() {
     return (
         
         <motion.div 
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ 
+            {...windowMotion({
             delay: 0.2,
             duration: 0.8,
             ease: [0.4, 0, 0.2, 1]
-            }}
+            })}
             className="w-full px-4 sm:px-6 lg:px-8 pt-4 pb-16"
         >
         {<GlassCard className="p-6 md:p-8">
@@ -226,22 +225,10 @@ export default function Load() {
         </div>
 
         {address && (
-        <div className="flex items-center justify-center gap-3 mb-6">
-            { <QRCode
-                value={address}
-                size='256'
-                bgColor="rgba(255, 255, 0, 0)"
-                fgColor="black"
-                level="H"
-                includeMargin={true}
-                style={{
-                height: "auto",
-                maxWidth: "20%",
-                width: "20%",
-                borderRadius: "5px",
-                boxShadow: "0 0px 0px rgba(0, 0, 0, 0.15)"
-                }}
-            />}
+        <div className="flex items-center justify-center mb-6">
+            <div className="w-[640px] max-w-[92vw]">
+                <BitcoinQr value={address} />
+            </div>
         </div>
         )}
         {address && (

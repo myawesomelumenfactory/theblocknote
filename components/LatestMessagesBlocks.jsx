@@ -7,6 +7,7 @@ import { applyVoteUp, applyVoteDown, getHighestFundedUnit } from '../services/Bi
 import { appendImmutable, loadImmutableRecords } from '../services/ImmutablesStore';
 import immutablesData, { immutablesState } from 'virtual:immutables';
 import { SharedContext } from '../src/SharedContext';
+import { windowMotion } from '../services/introMotion';
 
 const PAGE_SIZE = 5;
 
@@ -434,13 +435,11 @@ export default function LatestMessagesBlocks() {
 
   return (
     <motion.div 
-        initial={{ opacity: 0, y: 20, scale: 0.95 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ 
+        {...windowMotion({
         delay: 0.15,
         duration: 0.6,
         ease: [0.4, 0, 0.2, 1]
-        }}
+        })}
         className="w-full"
     >
     {<GlassCard className="p-6 md:p-8">
@@ -534,13 +533,11 @@ export default function LatestMessagesBlocks() {
           const txUrl = explorerTxUrl(txid);
           return (
           <motion.div 
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ 
+            {...windowMotion({
             delay: index * 0.05,
             duration: 0.4,
             ease: [0.4, 0, 0.2, 1]
-          }}
+          })}
           className="mb-4"
           key={t.index}
           >

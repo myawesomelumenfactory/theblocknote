@@ -1,13 +1,7 @@
-import Header from '../components/Header';
 import Load from '../components/Load';
 
 const PowerPage = () => {
-  return (
-    <>
-      <Header />
-      <Load />
-    </>
-  );
+  return <Load />;
 };
 
 export default PowerPage;
