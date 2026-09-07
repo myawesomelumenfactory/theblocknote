@@ -7,6 +7,7 @@ import {
   loadImmutableRecords,
   subscribeImmutablesProgress,
 } from '../services/ImmutablesStore'
+import { useChainTip } from '../services/ChainTipStore'
 import immutablesData, { immutablesState } from 'virtual:immutables'
 
 function formatHeight(value) {
@@ -21,6 +22,7 @@ function formatTime(value) {
 }
 
 export default function StatusPage() {
+  const chainTip = useChainTip()
   const [progress, setProgress] = useState(() => getImmutablesProgress())
 
   useEffect(() => {
@@ -35,14 +37,43 @@ export default function StatusPage() {
     }
   }, [])
 
-  const percent = Number.isFinite(progress.percent) ? progress.percent : 0
+  useEffect(() => {
+    if (!Number.isFinite(chainTip) || !Number.isFinite(progress.lastHeight)) return
+    if (chainTip <= progress.lastHeight) return
+    loadImmutableRecords(immutablesData, immutablesState)
+  }, [chainTip, progress.lastHeight])
+
+  const lastHeight = progress.lastHeight
+  const remaining =
+    Number.isFinite(chainTip) && Number.isFinite(lastHeight)
+      ? Math.max(0, chainTip - lastHeight)
+      : null
+  const caughtUp =
+    Number.isFinite(chainTip) && Number.isFinite(lastHeight) && lastHeight >= chainTip
+  const startHeight = progress.startHeight ?? lastHeight
+  const catchUpSpan =
+    Number.isFinite(chainTip) && Number.isFinite(startHeight)
+      ? Math.max(1, chainTip - startHeight)
+      : 1
+  const catchUpDone =
+    Number.isFinite(lastHeight) && Number.isFinite(startHeight)
+      ? Math.max(0, lastHeight - startHeight)
+      : 0
+  const percent = caughtUp || remaining === 0
+    ? 100
+    : Math.min(100, (catchUpDone / catchUpSpan) * 100)
+
   const label = progress.error
     ? 'Catch-up paused'
     : progress.scanning
       ? 'Catching up from mempool'
-      : progress.caughtUp
+      : caughtUp
         ? 'Caught up with the chain tip'
         : 'Checking the chain tip'
+
+  const chainTipHref = Number.isFinite(chainTip)
+    ? `https://mempool.space/block/${chainTip}`
+    : 'https://mempool.space'
 
   return (
     <>
@@ -67,12 +98,16 @@ export default function StatusPage() {
           </div>
           <p className="text-sm text-white/50 tabular-nums mb-8">
             {percent.toFixed(1)}% of this catch-up
-            {Number.isFinite(progress.remaining) ? ` · ${formatHeight(progress.remaining)} block${progress.remaining === 1 ? '' : 's'} remaining` : ''}
+            {Number.isFinite(remaining) ? ` · ${formatHeight(remaining)} block${remaining === 1 ? '' : 's'} remaining` : ''}
           </p>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Stat label="Indexed height" value={formatHeight(progress.lastHeight)} />
-            <Stat label="Chain tip" value={formatHeight(progress.tip)} />
+            <Stat label="Indexed height" value={formatHeight(lastHeight)} />
+            <Stat
+              label="Chain tip"
+              value={formatHeight(chainTip)}
+              href={chainTipHref}
+            />
             <Stat label="Messages" value={formatHeight(progress.count)} />
             <Stat label="Found this pass" value={formatHeight(progress.addedThisRun)} />
           </div>
@@ -89,11 +124,26 @@ export default function StatusPage() {
   )
 }
 
-function Stat({ label, value }) {
+function Stat({ label, value, href }) {
+  const number = (
+    <div className="text-xl md:text-2xl font-semibold text-white tabular-nums mt-1">{value}</div>
+  )
   return (
     <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
       <div className="text-xs uppercase tracking-wide text-white/40">{label}</div>
-      <div className="text-xl md:text-2xl font-semibold text-white tabular-nums mt-1">{value}</div>
+      {href ? (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Latest Bitcoin block on mempool.space"
+          className="hover:text-orange-300"
+        >
+          {number}
+        </a>
+      ) : (
+        number
+      )}
     </div>
   )
 }

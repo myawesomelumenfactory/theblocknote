@@ -49,8 +49,8 @@ export default function LatestMessagesBlocks() {
     return String(index || '').split('_')[0];
   }
 
-  function voteExplorerUrl(txid) {
-    return `https://mempool.space/tx/${txid}`;
+  function explorerTxUrl(txid) {
+    return txid ? `https://mempool.space/tx/${txid}` : null;
   }
 
   function toggleVoteList(messageIndex) {
@@ -529,7 +529,10 @@ export default function LatestMessagesBlocks() {
         </p>
       ) : null}
       <ul>
-        {pagedMessages.map((t, index) => (
+        {pagedMessages.map((t, index) => {
+          const txid = voteTxidFromIndex(t.index);
+          const txUrl = explorerTxUrl(txid);
+          return (
           <motion.div 
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -546,7 +549,19 @@ export default function LatestMessagesBlocks() {
               {/* Message Content */}
               <div>
                 <p className="text-white text-lg mb-2">{t.value}</p>
-                <p className="text-white/30 text-sm">{formatTimestampToUTC(t.time)}</p>
+                {txUrl ? (
+                    <a
+                      href={txUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="View this transaction on mempool.space"
+                      className="text-white/30 text-sm hover:text-white/60"
+                    >
+                      {formatTimestampToUTC(t.time)}
+                    </a>
+                ) : (
+                  <p className="text-white/30 text-sm">{formatTimestampToUTC(t.time)}</p>
+                )}
               </div>
               
               {/* Voting Controls at Bottom */}
@@ -622,7 +637,7 @@ export default function LatestMessagesBlocks() {
                             <span className="text-white/40 text-xs">{formatTimestampToUTC(vote.time)}</span>
                           </div>
                           <a
-                            href={voteExplorerUrl(vote.txid)}
+                            href={explorerTxUrl(vote.txid)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="font-mono text-xs text-white/80 hover:text-white break-all underline decoration-white/20 hover:decoration-white/60"
@@ -638,7 +653,8 @@ export default function LatestMessagesBlocks() {
             </div>
           </GlassCard> }
           </motion.div>
-        ))}
+          );
+        })}
       </ul>
 
       {visibleMessages.length > PAGE_SIZE && (
