@@ -71,6 +71,16 @@ export function getChainTip() {
   return height
 }
 
+export function applyChainTip(next) {
+  apply(next)
+}
+
+export async function refreshChainTip() {
+  start()
+  await pull()
+  return height
+}
+
 export function subscribeChainTip(onTip) {
   listeners.add(onTip)
   start()

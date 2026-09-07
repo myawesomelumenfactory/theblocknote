@@ -7,7 +7,8 @@ import {
   loadImmutableRecords,
   subscribeImmutablesProgress,
 } from '../services/ImmutablesStore'
-import { useChainTip } from '../services/ChainTipStore'
+import { applyChainTip, refreshChainTip, useChainTip } from '../services/ChainTipStore'
+import { mempoolTipHeight } from '../services/ImmutableLiveFill'
 import immutablesData, { immutablesState } from 'virtual:immutables'
 
 function formatHeight(value) {
@@ -34,6 +35,24 @@ export default function StatusPage() {
     return () => {
       stop()
       window.clearInterval(poll)
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    const checkTip = async () => {
+      const [, explorerTip] = await Promise.all([
+        refreshChainTip(),
+        mempoolTipHeight().catch(() => 0),
+      ])
+      if (cancelled) return
+      applyChainTip(explorerTip)
+    }
+    checkTip()
+    const tipPoll = window.setInterval(checkTip, 8_000)
+    return () => {
+      cancelled = true
+      window.clearInterval(tipPoll)
     }
   }, [])
 
