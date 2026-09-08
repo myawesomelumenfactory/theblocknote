@@ -307,18 +307,17 @@ function App() {
     <>
       <SharedContext.Provider value={{ refs, setRefs, addressFunds, fundsProgress, currentIndex, setCurrentIndex, refreshRefs: fetchAddresses, ensureUtxoHex }}>
         <LiveVisitBeacon onCount={publishLiveCount} />
-        <div>
-          <div className="h-screen bg-[radial-gradient(circle_at_center,_#3a5ca7_10%,_#1e2a4a_100%,_#0c0f1a_120%)] text-white relative overflow-x-hidden overflow-y-auto pb-50">
+        <div className="h-screen flex flex-col bg-[radial-gradient(circle_at_center,_#3a5ca7_10%,_#1e2a4a_100%,_#0c0f1a_120%)] text-white relative overflow-hidden">
               <Header />
-              <Routes>
-                <Route path="/" element={<MainPage />} />
-                <Route path="/power" element={<PowerPage />} />
-                <Route path="/read" element={<ReadPage />} />
-                <Route path="/generate" element={<GeneratePage />} />
-                <Route path="/status" element={<StatusPage />} />
-
-              </Routes>
-          </div>
+              <div className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto">
+                <Routes>
+                  <Route path="/" element={<MainPage />} />
+                  <Route path="/power" element={<PowerPage />} />
+                  <Route path="/read" element={<ReadPage />} />
+                  <Route path="/generate" element={<GeneratePage />} />
+                  <Route path="/status" element={<StatusPage />} />
+                </Routes>
+              </div>
         </div>
       </SharedContext.Provider>
     </>

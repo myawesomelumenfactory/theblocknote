@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState, useContext } from 'react';
+import React, { useEffect, useMemo, useState, useContext, useRef } from 'react';
 import { motion } from "framer-motion";
 import GlassCard from "./GlassCard";
 import { decodeOpReturn } from '../services/TheBlockNote';
-import { Activity, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Clock, List, Loader2 } from "lucide-react";
+import { Activity, ChevronUp, ChevronDown, Clock, List, Loader2 } from "lucide-react";
 import { applyVoteUp, applyVoteDown, getHighestFundedUnit } from '../services/BitcoinService';
 import { appendImmutable, loadImmutableRecords } from '../services/ImmutablesStore';
 import immutablesData, { immutablesState } from 'virtual:immutables';
@@ -10,7 +10,7 @@ import { SharedContext } from '../src/SharedContext';
 import { windowMotion } from '../services/introMotion';
 import { useLanguage } from '../src/i18n/LanguageContext';
 
-const PAGE_SIZE = 5;
+const BATCH_SIZE = 5;
 
 export default function LatestMessagesBlocks() {
 
@@ -18,7 +18,7 @@ export default function LatestMessagesBlocks() {
   const [opReturns, setOpReturns] = useState([]);
   const [theblocknote, setTheBlockNote] = useState([]);
   const [txids, setTxids] = useState([]);
-  const [page, setPage] = useState(0);
+  const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
   const [voteNotice, setVoteNotice] = useState(null);
   const [votingIndex, setVotingIndex] = useState(null);
   const [openVoteLists, setOpenVoteLists] = useState(() => new Set());
@@ -26,6 +26,8 @@ export default function LatestMessagesBlocks() {
   const [sortMode, setSortMode] = useState('latest');
   const { refs, ensureUtxoHex, refreshRefs } = useContext(SharedContext);
   const { t } = useLanguage();
+  const listRef = useRef(null);
+  const sentinelRef = useRef(null);
   const hasFundedUnit = Boolean(getHighestFundedUnit(Array.isArray(refs) ? refs : [], 450));
   const sortModes = [
     { id: 'latest', label: t('messages.latest'), title: t('messages.latestTitle') },
@@ -419,20 +421,36 @@ export default function LatestMessagesBlocks() {
   }, [theblocknote, sortMode]);
 
   useEffect(() => {
-    setPage(0);
+    setVisibleCount(BATCH_SIZE);
+    if (listRef.current) listRef.current.scrollTop = 0;
   }, [sortMode]);
 
   useEffect(() => {
-    const lastPage = Math.max(0, Math.ceil(visibleMessages.length / PAGE_SIZE) - 1);
-    setPage((current) => Math.min(current, lastPage));
+    setVisibleCount((current) => {
+      const total = visibleMessages.length;
+      if (total === 0) return BATCH_SIZE;
+      return Math.min(Math.max(current, BATCH_SIZE), total);
+    });
   }, [visibleMessages.length]);
 
-  const totalPages = Math.max(1, Math.ceil(visibleMessages.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages - 1);
-  const pagedMessages = visibleMessages.slice(
-    currentPage * PAGE_SIZE,
-    currentPage * PAGE_SIZE + PAGE_SIZE
-  );
+  const shownMessages = visibleMessages.slice(0, visibleCount);
+  const hasMore = visibleCount < visibleMessages.length;
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    const root = listRef.current;
+    if (!sentinel || !hasMore) return undefined;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        setVisibleCount((current) => Math.min(current + BATCH_SIZE, visibleMessages.length));
+      },
+      { root: root || null, rootMargin: '240px', threshold: 0 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, shownMessages.length, visibleMessages.length]);
 
   return (
     <motion.div 
@@ -441,9 +459,9 @@ export default function LatestMessagesBlocks() {
         duration: 0.6,
         ease: [0.4, 0, 0.2, 1]
         })}
-        className="w-full"
+        className="w-full h-full min-h-0 flex-1 flex flex-col"
     >
-    {<GlassCard className="p-6 md:p-8">
+    {<GlassCard className="p-6 md:p-8 h-full min-h-0 flex-1 flex flex-col overflow-hidden">
       <div className="flex items-start justify-between gap-3 mb-6">
           <div className="flex items-center gap-3 min-w-0">
             <Activity className="w-6 h-6 text-blue-400 shrink-0" />
@@ -514,7 +532,7 @@ export default function LatestMessagesBlocks() {
 
       {loading ? (
         <div
-          className="flex flex-col items-center justify-center py-16 min-h-[280px] gap-3"
+          className="flex flex-col items-center justify-center py-16 min-h-[280px] flex-1 gap-3"
           role="status"
           aria-live="polite"
         >
@@ -522,20 +540,23 @@ export default function LatestMessagesBlocks() {
           <span className="text-white/60 text-sm">{t('messages.loading')}</span>
         </div>
       ) : (
-      <div>
-      {pagedMessages.length === 0 ? (
+      <div
+        ref={listRef}
+        className="flex-1 min-h-0 overflow-y-auto overscroll-contain"
+      >
+      {shownMessages.length === 0 ? (
         <p className="text-white/50 text-sm py-8 text-center">
           {sortMode === 'down' ? t('messages.noDowns') : t('messages.none')}
         </p>
       ) : null}
       <ul>
-        {pagedMessages.map((msg, index) => {
+        {shownMessages.map((msg, index) => {
           const txid = voteTxidFromIndex(msg.index);
           const txUrl = explorerTxUrl(txid);
           return (
           <motion.div 
             {...windowMotion({
-            delay: index * 0.05,
+            delay: index < BATCH_SIZE ? index * 0.05 : 0,
             duration: 0.4,
             ease: [0.4, 0, 0.2, 1]
           })}
@@ -654,40 +675,17 @@ export default function LatestMessagesBlocks() {
           );
         })}
       </ul>
-
-      {visibleMessages.length > PAGE_SIZE && (
-        <div className="flex items-center justify-center gap-4 mt-2">
-          <button
-            type="button"
-            onClick={() => setPage(Math.max(0, currentPage - 1))}
-            disabled={currentPage === 0}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all duration-300 ${
-              currentPage === 0
-                ? 'bg-gray-200/12 text-gray-400 border-white/10 cursor-not-allowed'
-                : 'bg-white/10 text-white border-white/10 hover:bg-white/20 cursor-pointer'
-            }`}
-          >
-            <ChevronLeft className="w-4 h-4" />
-            <span className="text-sm">{t('messages.previous')}</span>
-          </button>
-          <span className="text-white/70 text-sm">
-            {currentPage + 1} / {totalPages}
-          </span>
-          <button
-            type="button"
-            onClick={() => setPage(Math.min(totalPages - 1, currentPage + 1))}
-            disabled={currentPage >= totalPages - 1}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all duration-300 ${
-              currentPage >= totalPages - 1
-                ? 'bg-gray-200/12 text-gray-400 border-white/10 cursor-not-allowed'
-                : 'bg-white/10 text-white border-white/10 hover:bg-white/20 cursor-pointer'
-            }`}
-          >
-            <span className="text-sm">{t('messages.next')}</span>
-            <ChevronRight className="w-4 h-4" />
-          </button>
+      {hasMore ? (
+        <div
+          ref={sentinelRef}
+          className="flex items-center justify-center gap-2 py-4"
+          role="status"
+          aria-live="polite"
+        >
+          <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
+          <span className="text-white/50 text-sm">{t('messages.loadingMore')}</span>
         </div>
-      )}
+      ) : null}
       </div>
       )}
 
