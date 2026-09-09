@@ -1,7 +1,10 @@
 import React from "react";
 import bitcoinLogo from "../src/assets/bitcoin.svg";
 
-const RING_R = 31
+const STROKE = 3
+const VIEW = 106
+const CENTER = VIEW / 2
+const RING_R = 50
 const RING_C = 2 * Math.PI * RING_R
 
 function ringProgress(percent) {
@@ -19,39 +22,39 @@ export default function BitcoinLogo({
   const dash = progress == null ? 0 : (RING_C * progress) / 100;
 
   return (
-    <span className={`relative inline-flex shrink-0 ${className}`}>
+    <span className={`relative inline-flex shrink-0 overflow-visible ${className}`}>
       <img
         src={bitcoinLogo}
         alt={alt}
         title={title}
-        className="h-full w-full select-none rounded-full"
+        className="relative z-0 block h-full w-full select-none"
         draggable="false"
       />
       {progress != null ? (
         <svg
-          className="pointer-events-none absolute inset-0 z-10 h-full w-full"
-          viewBox="0 0 64 64"
+          className="pointer-events-none absolute -inset-[3px] z-10 h-[calc(100%+6px)] w-[calc(100%+6px)]"
+          viewBox={`0 0 ${VIEW} ${VIEW}`}
           aria-hidden="true"
         >
           <circle
-            cx="32"
-            cy="32"
+            cx={CENTER}
+            cy={CENTER}
             r={RING_R}
             fill="none"
             stroke="rgba(255,255,255,0.35)"
-            strokeWidth="3"
+            strokeWidth={STROKE}
             vectorEffect="nonScalingStroke"
           />
           <circle
-            cx="32"
-            cy="32"
+            cx={CENTER}
+            cy={CENTER}
             r={RING_R}
             fill="none"
             stroke="#ffffff"
-            strokeWidth="3"
+            strokeWidth={STROKE}
             strokeLinecap="butt"
-            strokeDasharray={`${dash} ${RING_C}`}
-            transform="rotate(-90 32 32)"
+            strokeDasharray={progress >= 100 ? undefined : `${dash} ${RING_C}`}
+            transform={`rotate(-90 ${CENTER} ${CENTER})`}
             vectorEffect="nonScalingStroke"
           />
         </svg>

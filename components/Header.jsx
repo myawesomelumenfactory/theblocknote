@@ -18,8 +18,8 @@ const navClass = ({ isActive }) =>
 
 function logoPercent(progress) {
   if (!progress) return null;
-  if (progress.scanning) return progress.percent;
-  if (Number.isFinite(progress.percent) && progress.percent < 100) return progress.percent;
+  if (Number.isFinite(progress.percent)) return progress.percent;
+  if (progress.caughtUp) return 100;
   return null;
 }
 
@@ -28,9 +28,10 @@ export default function Header() {
   const { t } = useLanguage();
   const progress = useImmutablesProgress();
   const percent = logoPercent(progress);
-  const logoTitle = Number.isFinite(percent)
-    ? t('nav.immutablesProgress', { percent: Math.round(percent) })
-    : t('nav.immutablesUpToDate');
+  const logoTitle =
+    Number.isFinite(percent) && percent < 100
+      ? t('nav.immutablesProgress', { percent: Math.round(percent) })
+      : t('nav.immutablesUpToDate');
 
   return (
     <motion.div
