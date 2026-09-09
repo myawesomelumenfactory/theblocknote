@@ -56,6 +56,7 @@ export const translations = {
     nav: {
       declare: 'Declare',
       spark: 'Spark',
+      howItWorks: 'How it works',
       status: 'Status',
       about: 'About',
       menu: 'Menu',
@@ -198,6 +199,24 @@ export const translations = {
       confirmed: 'Confirmed',
       block: 'Block {height}',
     },
+    howItWorks: {
+      title: 'How it works',
+      lead:
+        'Usage is simple. You participate with a little Bitcoin as units of account — at least 0.00001 BTC — then you declare a truth that Bitcoin itself will keep.',
+      sparkTitle: 'Load units on Spark',
+      sparkBody:
+        'Open Spark and send a little Bitcoin to the participation address. Those coins become units of account. Once they are registered in The Block Note, you can take part.',
+      sparkLink: 'Go to Spark',
+      declareTitle: 'Declare your truth',
+      declareBody:
+        'Write your message on Declare. The Block Note records it as plain text inside a Bitcoin transaction. Anyone can read it.',
+      declareLink: 'Go to Declare',
+      permanentTitle: 'It stays on Bitcoin',
+      permanentBody:
+        'After the transaction is accepted into a Bitcoin block, no one can remove the text you entered. That is how Bitcoin works — and how The Block Note reveals it.',
+      close:
+        'The Block Note does not hide your words. It shows what Bitcoin already does: public, plain-text records that, once confirmed, cannot be taken back.',
+    },
     status: {
       title: 'Immutables',
       paused: 'Catch-up paused',
@@ -236,6 +255,7 @@ export const translations = {
     nav: {
       declare: 'Déclarer',
       spark: 'Étincelle',
+      howItWorks: 'Comment ça marche',
       status: 'État',
       about: 'À propos',
       menu: 'Menu',
@@ -377,6 +397,24 @@ export const translations = {
       confirmations: '{count} confirmations',
       confirmed: 'Confirmé',
       block: 'Bloc {height}',
+    },
+    howItWorks: {
+      title: 'Comment ça marche',
+      lead:
+        'L’usage est simple. Vous participez avec un peu de bitcoin comme unités de compte — au moins 0,00001 BTC — puis vous déclarez une vérité que Bitcoin lui-même conservera.',
+      sparkTitle: 'Charger des unités dans Étincelle',
+      sparkBody:
+        'Ouvrez Étincelle et envoyez un peu de bitcoin à l’adresse de participation. Ces pièces deviennent des unités de compte. Une fois enregistrées dans The Block Note, vous pouvez participer.',
+      sparkLink: 'Aller à Étincelle',
+      declareTitle: 'Déclarez votre vérité',
+      declareBody:
+        'Écrivez votre message dans Déclarer. The Block Note l’inscrit en clair dans une transaction Bitcoin. Tout le monde peut le lire.',
+      declareLink: 'Aller à Déclarer',
+      permanentTitle: 'Cela reste sur Bitcoin',
+      permanentBody:
+        'Une fois la transaction acceptée dans un bloc Bitcoin, personne ne peut retirer le texte que vous venez d’entrer. C’est ainsi que fonctionne Bitcoin — et c’est ce que The Block Note révèle.',
+      close:
+        'The Block Note ne cache pas vos mots. Il montre ce que Bitcoin fait déjà : des enregistrements publics, en clair, qui, une fois confirmés, ne peuvent plus être repris.',
     },
     status: {
       title: 'Immutables',

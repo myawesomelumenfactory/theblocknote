@@ -105,6 +105,13 @@ export default function Header() {
                 >
                   <span className="font-medium">{t('nav.status')}</span>
                 </NavLink>
+                <NavLink
+                  to="/how-it-works"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={navClass}
+                >
+                  <span className="font-medium">{t('nav.howItWorks')}</span>
+                </NavLink>
                 <Link
                   to="https://bitcoin.org/bitcoin.pdf"
                   target="_blank"
