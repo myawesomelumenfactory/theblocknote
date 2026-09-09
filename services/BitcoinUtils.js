@@ -23,6 +23,47 @@ export async function getRecommendedFee(fallbackFee = 450) {
 }
 
 /**
+ * Recommended fee rate in satoshis per vByte
+ * @param {number} [fallbackRate=10]
+ * @returns {Promise<number>}
+ */
+export async function getRecommendedFeeRate(fallbackRate = 10) {
+  try {
+    const response = await fetch('https://mempool.space/api/v1/fees/recommended');
+    const fees = await response.json();
+    return Math.max(Number(fees.fastestFee) || fallbackRate, 1);
+  } catch (error) {
+    console.warn('Could not fetch recommended fee rate, using fallback:', fallbackRate);
+    return fallbackRate;
+  }
+}
+
+/**
+ * Estimate a P2PKH transaction with no OP_RETURN (used for consolidation)
+ * @param {number} inputCount
+ * @param {number} [outputCount=1]
+ * @returns {number} Estimated size in bytes
+ */
+export function estimateP2pkhTransactionSize(inputCount, outputCount = 1) {
+  const baseSize = 10;
+  const inputSize = inputCount * 148;
+  const outputSize = outputCount * 34;
+  return baseSize + inputSize + outputSize;
+}
+
+/**
+ * Absolute fee for consolidating P2PKH units into one output
+ * @param {number} inputCount
+ * @param {number} [fallbackFee=450]
+ * @returns {Promise<number>} Fee in satoshis
+ */
+export async function estimateConsolidationFee(inputCount, fallbackFee = 450) {
+  const feeRate = await getRecommendedFeeRate();
+  const size = estimateP2pkhTransactionSize(inputCount, 1);
+  return Math.max(feeRate * size, fallbackFee);
+}
+
+/**
  * Estimate transaction size in bytes
  * @param {number} inputCount - Number of inputs
  * @param {number} outputCount - Number of outputs

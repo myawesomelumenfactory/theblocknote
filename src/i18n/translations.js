@@ -175,6 +175,15 @@ export const translations = {
       importFailed: 'Could not import those participation keys',
       error: 'Error:',
       fundedUnits: 'Funded units',
+      consolidate: 'Consolidate units',
+      consolidating: 'Consolidating…',
+      consolidateHint:
+        'Combine every funded unit into a single coin on the address shown in the QR code.',
+      consolidateConfirm:
+        'Spend all {count} funded units into one coin on {address}? Estimated fee: {fee} sats.',
+      consolidateNeedMore: 'Need at least two funded units to consolidate.',
+      consolidateNoAddress: 'Load a participation address before consolidating.',
+      consolidateSuccess: 'Units consolidated.\nView the transaction',
       noUnits: 'No funded units yet',
       noUnitsHint:
         'Send bitcoin to the QR address, or import keys that already have funds. Those units will appear here.',
@@ -346,6 +355,15 @@ export const translations = {
       importFailed: 'Impossible d’importer ces clés de participation',
       error: 'Erreur :',
       fundedUnits: 'Unités financées',
+      consolidate: 'Regrouper les unités',
+      consolidating: 'Regroupement…',
+      consolidateHint:
+        'Combine toutes les unités financées en une seule pièce sur l’adresse du QR.',
+      consolidateConfirm:
+        'Dépenser les {count} unités financées vers une seule pièce sur {address} ? Frais estimés : {fee} sats.',
+      consolidateNeedMore: 'Il faut au moins deux unités financées pour regrouper.',
+      consolidateNoAddress: 'Chargez une adresse de participation avant de regrouper.',
+      consolidateSuccess: 'Unités regroupées.\nVoir la transaction',
       noUnits: 'Aucune unité financée pour le moment',
       noUnitsHint:
         'Envoyez des bitcoins à l’adresse du QR, ou importez des clés déjà financées. Ces unités apparaîtront ici.',

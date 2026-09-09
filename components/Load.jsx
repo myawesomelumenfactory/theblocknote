@@ -1,7 +1,7 @@
 
 import { motion } from "framer-motion";
 import GlassCard from "../components/GlassCard";
-import { Activity, Copy, Check, Eye, EyeOff, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
+import { Activity, Copy, Check, Eye, EyeOff, ChevronLeft, ChevronRight, Trash2, Combine, Loader2 } from "lucide-react";
 
 import React, { useEffect, useState, useContext } from 'react';
 import BitcoinQr from "./QRCode";
@@ -16,6 +16,8 @@ import {
     writeStoredKeyPairs,
     clearStoredKeyPairs,
 } from '../services/ParticipationKeys';
+import { consolidateFundedUnits, getFundedUnits } from '../services/BitcoinService';
+import { estimateConsolidationFee } from '../services/BitcoinUtils';
 import { windowMotion } from '../services/introMotion';
 import { useLanguage } from '../src/i18n/LanguageContext';
 
@@ -55,6 +57,11 @@ export default function Load() {
     const [importError, setImportError] = useState(null);
     const [page, setPage] = useState(0);
     const [confirmingClear, setConfirmingClear] = useState(false);
+    const [confirmingConsolidate, setConfirmingConsolidate] = useState(false);
+    const [consolidating, setConsolidating] = useState(false);
+    const [consolidateFee, setConsolidateFee] = useState(null);
+    const [consolidateError, setConsolidateError] = useState(null);
+    const [consolidateTxId, setConsolidateTxId] = useState('');
     const { refs, setCurrentIndex, addressFunds, fundsProgress, refreshRefs, ensureUtxoHex } = useContext(SharedContext);
     const { t, locale } = useLanguage();
 
@@ -162,6 +169,76 @@ export default function Load() {
         window.location.reload();
     };
 
+    const shortAddress = (value) => {
+        if (!value) return '';
+        if (value.length <= 16) return value;
+        return `${value.slice(0, 6)}…${value.slice(-6)}`;
+    };
+
+    const handleStartConsolidate = async () => {
+        setConsolidateError(null);
+        setConsolidateTxId('');
+        const units = getFundedUnits(participationUnits);
+        if (!address) {
+            setConsolidateError(t('spark.consolidateNoAddress'));
+            return;
+        }
+        if (units.length < 2) {
+            setConsolidateError(t('spark.consolidateNeedMore'));
+            return;
+        }
+        try {
+            const fee = await estimateConsolidationFee(units.length);
+            setConsolidateFee(fee);
+            setConfirmingConsolidate(true);
+        } catch (error) {
+            setConsolidateError(error.message || t('compose.unexpected'));
+        }
+    };
+
+    const handleConsolidate = async () => {
+        const units = getFundedUnits(participationUnits);
+        if (!address) {
+            setConsolidateError(t('spark.consolidateNoAddress'));
+            return;
+        }
+        if (units.length < 2) {
+            setConsolidateError(t('spark.consolidateNeedMore'));
+            setConfirmingConsolidate(false);
+            return;
+        }
+
+        setConsolidating(true);
+        setConsolidateError(null);
+
+        try {
+            const prepared = [];
+            for (const unit of units) {
+                const full = unit.index != null && ensureUtxoHex
+                    ? await ensureUtxoHex(unit.index)
+                    : unit;
+                prepared.push(full || unit);
+            }
+
+            const fee = consolidateFee == null
+                ? await estimateConsolidationFee(prepared.length)
+                : consolidateFee;
+            const result = await consolidateFundedUnits(prepared, address, fee);
+
+            if (result.success) {
+                setConsolidateTxId(result.transactionId);
+                setConfirmingConsolidate(false);
+                if (refreshRefs) await refreshRefs();
+            } else {
+                setConsolidateError(result.error || t('compose.unexpected'));
+            }
+        } catch (error) {
+            setConsolidateError(error.message || t('compose.unexpected'));
+        } finally {
+            setConsolidating(false);
+        }
+    };
+
     const handleImport = async () => {
         setImportError(null);
         try {
@@ -206,6 +283,8 @@ export default function Load() {
         currentPage * PAGE_SIZE,
         currentPage * PAGE_SIZE + PAGE_SIZE
     );
+    const fundedUnits = getFundedUnits(participationUnits);
+    const canConsolidate = Boolean(address) && fundedUnits.length >= 2 && !consolidating;
 
     return (
         
@@ -455,10 +534,88 @@ export default function Load() {
             )}
         </div>
    
-        <div className="flex items-center gap-3 mb-6">
-            <Activity className="w-6 h-6 text-blue-400" />
-            <h2 className="text-2xl font-bold text-white">{t('spark.fundedUnits')}</h2>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+            <div className="flex items-center gap-3">
+                <Activity className="w-6 h-6 text-blue-400" />
+                <h2 className="text-2xl font-bold text-white">{t('spark.fundedUnits')}</h2>
+            </div>
+            {fundedUnits.length >= 2 && !confirmingConsolidate && (
+                <button
+                    type="button"
+                    onClick={handleStartConsolidate}
+                    disabled={!canConsolidate}
+                    className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl border transition-all duration-300 ${
+                        canConsolidate
+                            ? 'bg-white/10 text-white border-white/10 hover:bg-white/20 cursor-pointer'
+                            : 'bg-gray-200/12 text-gray-400 border-white/10 cursor-not-allowed'
+                    }`}
+                >
+                    {consolidating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Combine className="w-4 h-4" />}
+                    <span className="text-sm font-medium">
+                        {consolidating ? t('spark.consolidating') : t('spark.consolidate')}
+                    </span>
+                </button>
+            )}
+            {confirmingConsolidate && (
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                    <span className="text-sm text-orange-200">
+                        {t('spark.consolidateConfirm', {
+                            count: fundedUnits.length,
+                            address: shortAddress(address),
+                            fee: formatSats(consolidateFee, locale),
+                        })}
+                    </span>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setConfirmingConsolidate(false)}
+                            disabled={consolidating}
+                            className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-white/10 text-white border border-white/10 hover:bg-white/20 transition-all duration-300"
+                        >
+                            <span className="text-sm font-medium">{t('spark.cancel')}</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleConsolidate}
+                            disabled={consolidating}
+                            className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-orange-500/80 text-white border border-orange-300/40 hover:bg-orange-500 transition-all duration-300"
+                        >
+                            {consolidating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Combine className="w-4 h-4" />}
+                            <span className="text-sm font-medium">
+                                {consolidating ? t('spark.consolidating') : t('spark.consolidate')}
+                            </span>
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
+        {fundedUnits.length >= 2 && (
+            <p className="text-white/60 text-sm mb-6">
+                {t('spark.consolidateHint')}
+            </p>
+        )}
+        {consolidateError && (
+            <div className="p-4 mb-4 text-md text-red-800 rounded-lg bg-red-50 dark:bg-red-900/20 dark:text-red-300" role="alert">
+                <span className="font-bold">{t('spark.error')}</span> {consolidateError}
+            </div>
+        )}
+        {consolidateTxId && (
+            <div className="p-4 mb-6 text-md rounded-lg bg-gray-100/5" role="status">
+                <a
+                    href={`https://mempool.space/tx/${consolidateTxId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-white hover:text-white/80 font-bold text-center block"
+                >
+                    {t('spark.consolidateSuccess').split('\n').map((line, index) => (
+                        <span key={line}>
+                            {index > 0 ? <br /> : null}
+                            {line}
+                        </span>
+                    ))}
+                </a>
+            </div>
+        )}
 
         {participationUnits.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">

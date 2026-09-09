@@ -3,6 +3,7 @@ import * as ecc from 'tiny-secp256k1';
 import ECPairFactory from 'ecpair';
 import * as bitcoin from 'bitcoinjs-lib';
 import { encode } from '../services/TheBlockNote';
+import { estimateConsolidationFee, isValidAddress } from './BitcoinUtils';
 
 const ECPair = ECPairFactory(ecc);
 
@@ -228,6 +229,148 @@ export function getHighestFundedUnit(units, fee = 450) {
     }
   }
   return best;
+}
+
+const P2PKH_DUST = 546;
+
+export function getFundedUnits(units) {
+  if (!Array.isArray(units)) return [];
+
+  const seen = new Set();
+  const funded = [];
+  for (const unit of units) {
+    const value = Number(unit?.value) || 0;
+    if (value <= 0 || !unit?.tx_hash || unit.tx_output == null) continue;
+    const id = `${unit.tx_hash}:${unit.tx_output}`;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    funded.push(unit);
+  }
+  return funded;
+}
+
+function createConsolidationWithPSBT(units, destinationAddress, outputValue, network) {
+  const psbt = new bitcoin.Psbt({ network });
+
+  for (const unit of units) {
+    psbt.addInput({
+      hash: unit.tx_hash,
+      index: unit.tx_output,
+      nonWitnessUtxo: Buffer.from(unit.tx_raw_hex, 'hex'),
+    });
+  }
+
+  psbt.addOutput({
+    address: destinationAddress,
+    value: outputValue,
+  });
+
+  units.forEach((unit, index) => {
+    const keyPair = ECPair.fromWIF(unit.private_key, network);
+    psbt.signInput(index, createSigningKeyPair(keyPair));
+  });
+
+  psbt.finalizeAllInputs();
+  return psbt.extractTransaction().toHex();
+}
+
+function createConsolidationManually(units, destinationAddress, outputValue, network) {
+  const tx = new bitcoin.Transaction();
+  const hashType = bitcoin.Transaction.SIGHASH_ALL;
+
+  for (const unit of units) {
+    tx.addInput(Buffer.from(unit.tx_hash, 'hex').reverse(), unit.tx_output);
+  }
+
+  tx.addOutput(bitcoin.address.toOutputScript(destinationAddress, network), outputValue);
+
+  units.forEach((unit, index) => {
+    const keyPair = ECPair.fromWIF(unit.private_key, network);
+    const prevOutScript = bitcoin.address.toOutputScript(unit.public_key, network);
+    const signatureHash = tx.hashForSignature(index, prevOutScript, hashType);
+    const signature = keyPair.sign(signatureHash);
+    const signatureBuffer = signature instanceof Uint8Array ? Buffer.from(signature) : signature;
+    const pubkeyBuffer = keyPair.publicKey instanceof Uint8Array
+      ? Buffer.from(keyPair.publicKey)
+      : keyPair.publicKey;
+
+    tx.setInputScript(index, bitcoin.script.compile([
+      Buffer.concat([signatureBuffer, Buffer.from([hashType])]),
+      pubkeyBuffer,
+    ]));
+  });
+
+  return tx.toHex();
+}
+
+export async function createConsolidationTransaction(units, destinationAddress, fee) {
+  const network = bitcoin.networks.bitcoin;
+  const funded = getFundedUnits(units);
+
+  if (funded.length < 2) {
+    throw new Error('Need at least two funded units to consolidate');
+  }
+
+  if (!destinationAddress || !isValidAddress(destinationAddress, network)) {
+    throw new Error('Invalid destination address');
+  }
+
+  for (const unit of funded) {
+    if (!validateUTXO(unit)) {
+      throw new Error('A funded unit is missing the data needed to sign');
+    }
+  }
+
+  const total = funded.reduce((sum, unit) => sum + (Number(unit.value) || 0), 0);
+  const outputValue = total - fee;
+
+  if (outputValue < P2PKH_DUST) {
+    throw new Error('Insufficient funds for consolidation fee');
+  }
+
+  try {
+    return createConsolidationWithPSBT(funded, destinationAddress, outputValue, network);
+  } catch (psbtError) {
+    console.warn('PSBT consolidation failed, trying manual transaction creation:', psbtError.message);
+    return createConsolidationManually(funded, destinationAddress, outputValue, network);
+  }
+}
+
+/**
+ * Spend every funded unit into a single P2PKH output
+ * @param {Array} units
+ * @param {string} destinationAddress
+ * @param {number} [fee]
+ * @returns {Promise<Object>}
+ */
+export async function consolidateFundedUnits(units, destinationAddress, fee) {
+  try {
+    const funded = getFundedUnits(units);
+    const resolvedFee = fee == null
+      ? await estimateConsolidationFee(funded.length)
+      : fee;
+    const outputValue = funded.reduce((sum, unit) => sum + (Number(unit.value) || 0), 0) - resolvedFee;
+    const rawTxHex = await createConsolidationTransaction(funded, destinationAddress, resolvedFee);
+    const transactionId = await broadcastTransaction(rawTxHex);
+    const cleanId = transactionId.replace(/[^a-f0-9]/gi, '');
+
+    return {
+      success: true,
+      transactionId: cleanId,
+      rawTxHex,
+      explorerUrl: `https://mempool.space/tx/${cleanId}`,
+      fee: resolvedFee,
+      outputValue,
+      inputCount: funded.length,
+    };
+  } catch (error) {
+    console.error('Consolidation failed:', error.message);
+    return {
+      success: false,
+      error: error.message,
+      rawTxHex: error.rawTxHex || null,
+    };
+  }
 }
 
 /**
