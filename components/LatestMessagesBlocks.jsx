@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useContext, useRef } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from "framer-motion";
 import GlassCard from "./GlassCard";
 import { decodeOpReturn } from '../services/TheBlockNote';
@@ -26,7 +26,6 @@ export default function LatestMessagesBlocks() {
   const [sortMode, setSortMode] = useState('latest');
   const { refs, ensureUtxoHex, refreshRefs } = useContext(SharedContext);
   const { t } = useLanguage();
-  const listRef = useRef(null);
   const sentinelRef = useRef(null);
   const hasFundedUnit = Boolean(getHighestFundedUnit(Array.isArray(refs) ? refs : [], 450));
   const sortModes = [
@@ -422,13 +421,12 @@ export default function LatestMessagesBlocks() {
 
   useEffect(() => {
     setVisibleCount(BATCH_SIZE);
-    if (listRef.current) listRef.current.scrollTop = 0;
   }, [sortMode]);
 
   useEffect(() => {
     setVisibleCount((current) => {
       const total = visibleMessages.length;
-      if (total === 0) return BATCH_SIZE;
+      if (total === 0) return current;
       return Math.min(Math.max(current, BATCH_SIZE), total);
     });
   }, [visibleMessages.length]);
@@ -436,21 +434,35 @@ export default function LatestMessagesBlocks() {
   const shownMessages = visibleMessages.slice(0, visibleCount);
   const hasMore = visibleCount < visibleMessages.length;
 
+  const loadMore = useCallback(() => {
+    setVisibleCount((current) => {
+      const total = visibleMessages.length;
+      if (current >= total) return current;
+      return Math.min(current + BATCH_SIZE, total);
+    });
+  }, [visibleMessages.length]);
+
   useEffect(() => {
     const sentinel = sentinelRef.current;
-    const root = listRef.current;
     if (!sentinel || !hasMore) return undefined;
+
+    let root = sentinel.parentElement;
+    while (root) {
+      const overflowY = window.getComputedStyle(root).overflowY;
+      if (overflowY === 'auto' || overflowY === 'scroll') break;
+      root = root.parentElement;
+    }
 
     const observer = new IntersectionObserver(
       (entries) => {
         if (!entries[0]?.isIntersecting) return;
-        setVisibleCount((current) => Math.min(current + BATCH_SIZE, visibleMessages.length));
+        loadMore();
       },
-      { root: root || null, rootMargin: '240px', threshold: 0 }
+      { root, rootMargin: '200px', threshold: 0 }
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [hasMore, shownMessages.length, visibleMessages.length]);
+  }, [hasMore, shownMessages.length, loadMore]);
 
   return (
     <motion.div 
@@ -459,9 +471,9 @@ export default function LatestMessagesBlocks() {
         duration: 0.6,
         ease: [0.4, 0, 0.2, 1]
         })}
-        className="w-full h-full min-h-0 flex-1 flex flex-col"
+        className="w-full"
     >
-    {<GlassCard className="p-6 md:p-8 h-full min-h-0 flex-1 flex flex-col overflow-hidden">
+    {<GlassCard className="p-6 md:p-8">
       <div className="flex items-start justify-between gap-3 mb-6">
           <div className="flex items-center gap-3 min-w-0">
             <Activity className="w-6 h-6 text-blue-400 shrink-0" />
@@ -532,7 +544,7 @@ export default function LatestMessagesBlocks() {
 
       {loading ? (
         <div
-          className="flex flex-col items-center justify-center py-16 min-h-[280px] flex-1 gap-3"
+          className="flex flex-col items-center justify-center py-16 min-h-[280px] gap-3"
           role="status"
           aria-live="polite"
         >
@@ -540,10 +552,7 @@ export default function LatestMessagesBlocks() {
           <span className="text-white/60 text-sm">{t('messages.loading')}</span>
         </div>
       ) : (
-      <div
-        ref={listRef}
-        className="flex-1 min-h-0 overflow-y-auto overscroll-contain"
-      >
+      <div>
       {shownMessages.length === 0 ? (
         <p className="text-white/50 text-sm py-8 text-center">
           {sortMode === 'down' ? t('messages.noDowns') : t('messages.none')}
@@ -676,15 +685,15 @@ export default function LatestMessagesBlocks() {
         })}
       </ul>
       {hasMore ? (
-        <div
+        <button
+          type="button"
           ref={sentinelRef}
-          className="flex items-center justify-center gap-2 py-4"
-          role="status"
-          aria-live="polite"
+          onClick={loadMore}
+          className="flex items-center justify-center gap-2 py-4 text-white/50 hover:text-white/80 transition-colors"
         >
           <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
-          <span className="text-white/50 text-sm">{t('messages.loadingMore')}</span>
-        </div>
+          <span className="text-sm">{t('messages.loadingMore')}</span>
+        </button>
       ) : null}
       </div>
       )}
