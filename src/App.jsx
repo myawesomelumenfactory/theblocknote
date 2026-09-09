@@ -12,6 +12,8 @@ import { SharedContext } from '../src/SharedContext';
 import { fetchBalances, fetchTipHeight, fetchTxHex, fetchUnspents } from '../services/HaskoinStore';
 import { getHighestFundedUnit } from '../services/BitcoinService';
 import { endIntro } from '../services/introMotion';
+import { loadImmutableRecords } from '../services/ImmutablesStore';
+import immutablesData, { immutablesState } from 'virtual:immutables';
 
 const CONFIRMED_AFTER = 6;
 
@@ -41,6 +43,10 @@ function App() {
 
   useEffect(() => {
     endIntro();
+  }, []);
+
+  useEffect(() => {
+    loadImmutableRecords(immutablesData, immutablesState);
   }, []);
 
   useEffect(() => {

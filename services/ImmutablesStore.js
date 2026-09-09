@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { catchUpImmutables } from './ImmutableLiveFill.js'
 
 const OVERLAY_KEY = 'immutablesOverlay'
@@ -265,4 +266,17 @@ export async function loadImmutableRecords(bundledRecords, bundledState) {
   const snapshot = hydrateFromBundled(bundledRecords, bundledState)
   startCatchUp(snapshot.state.lastHeight)
   return mergeImmutables(snapshot.records, readImmutablesOverlay())
+}
+
+export function useImmutablesProgress() {
+  const [progress, setProgress] = useState(getImmutablesProgress)
+  useEffect(() => {
+    const stop = subscribeImmutablesProgress(setProgress)
+    const poll = window.setInterval(() => setProgress(getImmutablesProgress()), 1000)
+    return () => {
+      stop()
+      window.clearInterval(poll)
+    }
+  }, [])
+  return progress
 }

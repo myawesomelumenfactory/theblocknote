@@ -7,6 +7,7 @@ import BitcoinLogo from "./BitcoinLogo";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { windowMotion } from "../services/introMotion";
 import { useLanguage } from "../src/i18n/LanguageContext";
+import { useImmutablesProgress } from "../services/ImmutablesStore";
 
 const navClass = ({ isActive }) =>
   `flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300 border ${
@@ -15,9 +16,21 @@ const navClass = ({ isActive }) =>
       : 'bg-white-400/20 text-white/70 border-white/10 hover:text-white hover:bg-white/10'
   }`;
 
+function logoPercent(progress) {
+  if (!progress) return null;
+  if (progress.scanning) return progress.percent;
+  if (Number.isFinite(progress.percent) && progress.percent < 100) return progress.percent;
+  return null;
+}
+
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { t } = useLanguage();
+  const progress = useImmutablesProgress();
+  const percent = logoPercent(progress);
+  const logoTitle = Number.isFinite(percent)
+    ? t('nav.immutablesProgress', { percent: Math.round(percent) })
+    : t('nav.immutablesUpToDate');
 
   return (
     <motion.div
@@ -34,19 +47,22 @@ export default function Header() {
             {/* Parent flex container, responsive */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               {/* Left: Logo + Tagline */}
-              <div className="flex items-center gap-4">
-                <BitcoinLogo className="w-10 h-10 drop-shadow-lg" />
-                <div>
-                  <h1 className="text-xl font-bold text-white">{t('app.tagline')}</h1>
-                  <p className="text-sm text-white/50">{t('app.subtitle')}</p>
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4 min-w-0">
+                  <BitcoinLogo
+                    className="w-10 h-10 drop-shadow-lg"
+                    percent={percent}
+                    title={logoTitle}
+                  />
+                  <div className="min-w-0">
+                    <h1 className="text-xl font-bold text-white">{t('app.tagline')}</h1>
+                    <p className="text-sm text-white/50">{t('app.subtitle')}</p>
+                  </div>
                 </div>
-              </div>
-
-              {/* Mobile toggle */}
-              <div className="md:hidden flex justify-end">
                 <button
+                  type="button"
                   onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                  className="text-white"
+                  className="md:hidden shrink-0 text-white"
                   aria-label={mobileMenuOpen ? t('nav.closeMenu') : t('nav.menu')}
                 >
                   {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -59,6 +75,13 @@ export default function Header() {
                   mobileMenuOpen ? "flex" : "hidden"
                 } flex-col md:flex md:flex-row items-start md:items-center gap-2 md:gap-3`}
               >
+                <div className="md:hidden w-full flex justify-center py-3 mb-1 border-b border-white/10">
+                  <BitcoinLogo
+                    className="w-20 h-20 drop-shadow-lg"
+                    percent={percent}
+                    title={logoTitle}
+                  />
+                </div>
                 <NavLink
                   to="/"
                   end

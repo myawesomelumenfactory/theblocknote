@@ -60,6 +60,8 @@ export const translations = {
       about: 'About',
       menu: 'Menu',
       closeMenu: 'Close menu',
+      immutablesProgress: 'Immutables catch-up {percent}%',
+      immutablesUpToDate: 'Immutables are up to date',
     },
     lang: {
       switcher: 'Language',
@@ -229,6 +231,8 @@ export const translations = {
       about: 'À propos',
       menu: 'Menu',
       closeMenu: 'Fermer le menu',
+      immutablesProgress: 'Rattrapage des immutables {percent} %',
+      immutablesUpToDate: 'Les immutables sont à jour',
     },
     lang: {
       switcher: 'Langue',
