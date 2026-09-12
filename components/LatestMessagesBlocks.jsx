@@ -476,7 +476,7 @@ export default function LatestMessagesBlocks() {
     {<GlassCard className="p-6 md:p-8">
       <div className="flex items-start justify-between gap-3 mb-6">
           <div className="flex items-center gap-3 min-w-0">
-            <Activity className="w-6 h-6 text-blue-400 shrink-0" />
+            <Activity className="w-6 h-6 text-[color:var(--theme-accent)] shrink-0" />
             <h2 className="text-2xl font-bold text-white">{t('messages.title')}</h2>
           </div>
           <div
@@ -548,7 +548,7 @@ export default function LatestMessagesBlocks() {
           role="status"
           aria-live="polite"
         >
-          <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+          <Loader2 className="w-8 h-8 text-[color:var(--theme-accent)] animate-spin" />
           <span className="text-white/60 text-sm">{t('messages.loading')}</span>
         </div>
       ) : (
@@ -691,7 +691,7 @@ export default function LatestMessagesBlocks() {
           onClick={loadMore}
           className="flex items-center justify-center gap-2 py-4 text-white/50 hover:text-white/80 transition-colors"
         >
-          <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
+          <Loader2 className="w-4 h-4 text-[color:var(--theme-accent)] animate-spin" />
           <span className="text-sm">{t('messages.loadingMore')}</span>
         </button>
       ) : null}

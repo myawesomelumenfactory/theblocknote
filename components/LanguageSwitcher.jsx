@@ -11,7 +11,7 @@ export default function LanguageSwitcher({ onSelect }) {
   const buttonClass = (active) =>
     `px-2.5 py-1 rounded-lg text-xs font-semibold tracking-wide transition-all duration-200 ${
       active
-        ? 'bg-[#3a5ca7]/80 text-white border border-[#8eb0e8]/50'
+        ? 'bg-[color:var(--theme-nav-active-bg)] text-white border border-[color:var(--theme-nav-active-border)]'
         : 'text-white/55 border border-transparent hover:text-white hover:bg-white/10'
     }`
 

@@ -1,9 +1,41 @@
 @import "tailwindcss";
 
+:root,
+html[data-theme="deep-ledger"] {
+  --theme-body: #1e2a4a;
+  --theme-bg: radial-gradient(circle at center, #3a5ca7 10%, #1e2a4a 100%, #0c0f1a 120%);
+  --theme-accent: #60a5fa;
+  --theme-accent-strong: #3a5ca7;
+  --theme-accent-soft: #8eb0e8;
+  --theme-nav-active-bg: rgba(58, 92, 167, 0.7);
+  --theme-nav-active-border: rgba(142, 176, 232, 0.5);
+  --theme-nav-active-shadow: 0 0 12px rgba(58, 92, 167, 0.45);
+  --theme-card-bg: rgba(255, 255, 255, 0.05);
+  --theme-card-border: rgba(255, 255, 255, 0.2);
+  --theme-chip-bg: rgba(255, 255, 255, 0.08);
+}
+
+html[data-theme="bitcoin-orange"] {
+  --theme-body: #050505;
+  --theme-bg:
+    radial-gradient(circle at 28% 18%, rgba(247, 147, 26, 0.42) 0%, transparent 42%),
+    radial-gradient(circle at 78% 82%, rgba(247, 147, 26, 0.22) 0%, transparent 48%),
+    linear-gradient(165deg, #1a1208 0%, #0a0a0a 48%, #000000 100%);
+  --theme-accent: #f7931a;
+  --theme-accent-strong: #f7931a;
+  --theme-accent-soft: #ffb457;
+  --theme-nav-active-bg: rgba(247, 147, 26, 0.28);
+  --theme-nav-active-border: rgba(255, 180, 87, 0.55);
+  --theme-nav-active-shadow: 0 0 14px rgba(247, 147, 26, 0.35);
+  --theme-card-bg: rgba(255, 255, 255, 0.06);
+  --theme-card-border: rgba(255, 255, 255, 0.18);
+  --theme-chip-bg: rgba(247, 147, 26, 0.12);
+}
+
 body {
     margin: 0;
     height: 100vh;
-    background-color: rgb(53, 146, 240);
+    background-color: var(--theme-body);
     overflow: hidden;
     position: relative;
     font-family: sans-serif;

@@ -69,6 +69,12 @@ export const translations = {
       en: 'English',
       fr: 'Français',
     },
+    theme: {
+      switcher: 'Theme',
+      bitcoinOrange: 'Bitcoin Orange',
+      deepLedger: 'Deep Ledger',
+      hint: 'Switch between Bitcoin branding and the legacy blue UI',
+    },
     chain: {
       block: 'Block',
       latest: 'Latest Bitcoin block',
@@ -267,6 +273,12 @@ export const translations = {
       switcher: 'Langue',
       en: 'English',
       fr: 'Français',
+    },
+    theme: {
+      switcher: 'Thème',
+      bitcoinOrange: 'Bitcoin Orange',
+      deepLedger: 'Grand Livre',
+      hint: 'Basculer entre la charte Bitcoin et l’interface bleue d’origine',
     },
     chain: {
       block: 'Bloc',

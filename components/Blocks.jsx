@@ -44,7 +44,7 @@ export default function Transactions() {
   return (
     <GlassCard className="p-8 mb-8 max-w-5xl mx-auto" delay={0.2}>
         <div className="flex items-center gap-3 mb-6">
-            <Activity className="w-6 h-6 text-blue-400" />
+            <Activity className="w-6 h-6 text-[color:var(--theme-accent)]" />
             <h2 className="text-2xl font-bold text-white">Recent Transactions</h2>
         </div>
 

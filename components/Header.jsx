@@ -12,7 +12,7 @@ import { useImmutablesProgress } from "../services/ImmutablesStore";
 const navClass = ({ isActive }) =>
   `flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300 border ${
     isActive
-      ? 'bg-[#3a5ca7]/70 text-white border-[#8eb0e8]/50 shadow-[0_0_12px_rgba(58,92,167,0.45)]'
+      ? 'bg-[color:var(--theme-nav-active-bg)] text-white border-[color:var(--theme-nav-active-border)] shadow-[var(--theme-nav-active-shadow)]'
       : 'bg-white-400/20 text-white/70 border-white/10 hover:text-white hover:bg-white/10'
   }`;
 
@@ -44,7 +44,7 @@ export default function Header() {
     >
       <nav className="relative z-10">
         <div className="w-full">
-          <div className="backdrop-blur-xl bg-white-900/30 rounded-2xl border border-white/20 p-4 shadow-2xl">
+          <div className="backdrop-blur-xl bg-[color:var(--theme-card-bg)] rounded-2xl border border-[color:var(--theme-card-border)] p-4 shadow-2xl">
             {/* Parent flex container, responsive */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               {/* Left: Logo + Tagline */}

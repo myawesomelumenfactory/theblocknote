@@ -11,7 +11,7 @@ export default function GlassCard({
   return (
     <div
       className={`
-      backdrop-blur-xl bg-white/5 rounded-3xl border border-white/20
+      backdrop-blur-xl bg-[color:var(--theme-card-bg)] rounded-3xl border border-[color:var(--theme-card-border)]
       shadow-2xl hover:shadow-[0_10px_40px_rgba(0,0,0,0.3)] transition-all duration-300
         ${className}
       `}

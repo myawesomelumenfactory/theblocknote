@@ -25,7 +25,7 @@ export default function HowItWorksPage() {
     >
       <GlassCard className="max-w-3xl mx-auto p-6 md:p-8">
         <div className="flex items-start gap-3 mb-6">
-          <BookOpen className="w-6 h-6 text-orange-400 shrink-0 mt-1" />
+          <BookOpen className="w-6 h-6 text-[color:var(--theme-accent)] shrink-0 mt-1" />
           <div>
             <h2 className="text-2xl font-bold text-white">{t('howItWorks.title')}</h2>
             <p className="text-white/70 mt-3 leading-relaxed">{t('howItWorks.lead')}</p>
@@ -45,7 +45,7 @@ export default function HowItWorksPage() {
                     {index + 1}
                   </span>
                   <div className="flex items-center gap-2 min-w-0 pt-1">
-                    <Icon className="w-4 h-4 text-orange-300 shrink-0" />
+                    <Icon className="w-4 h-4 text-[color:var(--theme-accent-soft)] shrink-0" />
                     <h3 className="text-lg font-semibold text-white">{t(`howItWorks.${step.key}Title`)}</h3>
                   </div>
                 </div>
@@ -53,7 +53,7 @@ export default function HowItWorksPage() {
                 {step.to ? (
                   <Link
                     to={step.to}
-                    className="inline-block mt-3 ml-11 text-sm font-medium text-orange-300"
+                    className="inline-block mt-3 ml-11 text-sm font-medium text-[color:var(--theme-accent-soft)]"
                   >
                     {t(`howItWorks.${step.key}Link`)}
                   </Link>

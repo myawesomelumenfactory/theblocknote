@@ -320,7 +320,7 @@ export default function Load() {
 
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
             <div className="flex items-center gap-3">
-                <Activity className="w-6 h-6 text-blue-400" />
+                <Activity className="w-6 h-6 text-[color:var(--theme-accent)]" />
                 <h2 className="text-2xl font-bold text-white">{t('spark.keysTitle')}</h2>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
@@ -536,7 +536,7 @@ export default function Load() {
    
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
             <div className="flex items-center gap-3">
-                <Activity className="w-6 h-6 text-blue-400" />
+                <Activity className="w-6 h-6 text-[color:var(--theme-accent)]" />
                 <h2 className="text-2xl font-bold text-white">{t('spark.fundedUnits')}</h2>
             </div>
             {fundedUnits.length >= 2 && !confirmingConsolidate && (

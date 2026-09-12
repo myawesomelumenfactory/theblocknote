@@ -9,6 +9,7 @@ import StatusPage from '../pages/StatusPage';
 import HowItWorksPage from '../pages/HowItWorksPage';
 import LiveVisitBeacon from '../components/LiveVisitBeacon';
 import Header from '../components/Header';
+import ThemeSwitcher from '../components/ThemeSwitcher';
 import { SharedContext } from '../src/SharedContext';
 import { fetchBalances, fetchTipHeight, fetchTxHex, fetchUnspents } from '../services/HaskoinStore';
 import { getHighestFundedUnit } from '../services/BitcoinService';
@@ -314,7 +315,7 @@ function App() {
     <>
       <SharedContext.Provider value={{ refs, setRefs, addressFunds, fundsProgress, currentIndex, setCurrentIndex, refreshRefs: fetchAddresses, ensureUtxoHex }}>
         <LiveVisitBeacon onCount={publishLiveCount} />
-        <div className="h-screen flex flex-col bg-[radial-gradient(circle_at_center,_#3a5ca7_10%,_#1e2a4a_100%,_#0c0f1a_120%)] text-white relative overflow-hidden">
+        <div className="h-screen flex flex-col bg-[image:var(--theme-bg)] text-white relative overflow-hidden">
               <Header />
               <div className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto">
                 <Routes>
@@ -326,6 +327,7 @@ function App() {
                   <Route path="/how-it-works" element={<HowItWorksPage />} />
                 </Routes>
               </div>
+              <ThemeSwitcher />
         </div>
       </SharedContext.Provider>
     </>

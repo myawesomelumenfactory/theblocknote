@@ -6,6 +6,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>The Block Note</title>
     <script>
+      (function () {
+        try {
+          var theme = localStorage.getItem('theblocknote.theme');
+          if (theme !== 'bitcoin-orange' && theme !== 'deep-ledger') theme = 'bitcoin-orange';
+          document.documentElement.setAttribute('data-theme', theme);
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'bitcoin-orange');
+        }
+      })();
       if (navigator.serviceWorker) {
         navigator.serviceWorker.getRegistrations().then(function (regs) {
           for (var i = 0; i < regs.length; i++) regs[i].unregister();
