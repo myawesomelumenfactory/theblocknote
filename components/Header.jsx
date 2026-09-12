@@ -44,7 +44,10 @@ export default function Header() {
     >
       <nav className="relative z-10">
         <div className="w-full">
-          <div className="backdrop-blur-xl bg-[color:var(--theme-card-bg)] rounded-2xl border border-[color:var(--theme-card-border)] p-4 shadow-2xl">
+          <div
+            className="bg-[color:var(--theme-card-bg)] rounded-2xl border border-[color:var(--theme-card-border)] p-4 shadow-[var(--theme-panel-shadow)]"
+            style={{ backdropFilter: 'blur(var(--theme-card-blur))', WebkitBackdropFilter: 'blur(var(--theme-card-blur))' }}
+          >
             {/* Parent flex container, responsive */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               {/* Left: Logo + Tagline */}

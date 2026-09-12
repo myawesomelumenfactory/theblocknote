@@ -9,27 +9,102 @@ html[data-theme="deep-ledger"] {
   --theme-accent-soft: #8eb0e8;
   --theme-nav-active-bg: rgba(58, 92, 167, 0.7);
   --theme-nav-active-border: rgba(142, 176, 232, 0.5);
-  --theme-nav-active-shadow: 0 0 12px rgba(58, 92, 167, 0.45);
+  --theme-nav-active-shadow: 0 0 8px rgba(58, 92, 167, 0.28);
   --theme-card-bg: rgba(255, 255, 255, 0.05);
   --theme-card-border: rgba(255, 255, 255, 0.2);
   --theme-chip-bg: rgba(255, 255, 255, 0.08);
+  --theme-fg: #ffffff;
+  --theme-fg-muted: rgba(255, 255, 255, 0.7);
+  --theme-fg-subtle: rgba(255, 255, 255, 0.4);
+  --theme-panel-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
+  --theme-card-blur: 20px;
 }
 
 html[data-theme="bitcoin-orange"] {
-  --theme-body: #050505;
+  --theme-body: #ffffff;
   --theme-bg:
-    radial-gradient(circle at 28% 18%, rgba(247, 147, 26, 0.42) 0%, transparent 42%),
-    radial-gradient(circle at 78% 82%, rgba(247, 147, 26, 0.22) 0%, transparent 48%),
-    linear-gradient(165deg, #1a1208 0%, #0a0a0a 48%, #000000 100%);
-  --theme-accent: #f7931a;
+    radial-gradient(circle at 16% 8%, #ffffff 0%, transparent 36%),
+    radial-gradient(circle at 84% 12%, rgba(255, 232, 196, 0.55) 0%, transparent 40%),
+    radial-gradient(circle at 50% 40%, rgba(247, 147, 26, 0.08) 0%, transparent 55%),
+    radial-gradient(circle at 70% 90%, rgba(255, 248, 238, 0.95) 0%, transparent 46%),
+    linear-gradient(180deg, #ffffff 0%, #fffdf9 48%, #fff4e4 100%);
+  --theme-accent: #e07800;
   --theme-accent-strong: #f7931a;
-  --theme-accent-soft: #ffb457;
-  --theme-nav-active-bg: rgba(247, 147, 26, 0.28);
-  --theme-nav-active-border: rgba(255, 180, 87, 0.55);
-  --theme-nav-active-shadow: 0 0 14px rgba(247, 147, 26, 0.35);
-  --theme-card-bg: rgba(255, 255, 255, 0.06);
-  --theme-card-border: rgba(255, 255, 255, 0.18);
-  --theme-chip-bg: rgba(247, 147, 26, 0.12);
+  --theme-accent-soft: #f7931a;
+  --theme-nav-active-bg: #f7931a;
+  --theme-nav-active-border: rgba(255, 255, 255, 0.95);
+  --theme-nav-active-shadow: 0 4px 12px rgba(247, 147, 26, 0.22);
+  --theme-card-bg: rgba(255, 255, 255, 0.42);
+  --theme-card-border: rgba(40, 24, 8, 0.08);
+  --theme-chip-bg: rgba(247, 147, 26, 0.1);
+  --theme-fg: #161616;
+  --theme-fg-muted: rgba(22, 22, 22, 0.68);
+  --theme-fg-subtle: rgba(22, 22, 22, 0.42);
+  --theme-panel-shadow: 0 4px 14px rgba(80, 40, 0, 0.05);
+  --theme-card-blur: 24px;
+}
+
+/* Light Bitcoin Orange: remap common dark-theme utilities to ink on white. */
+html[data-theme="bitcoin-orange"] .text-white {
+  color: var(--theme-fg);
+}
+html[data-theme="bitcoin-orange"] .text-white\/80 {
+  color: rgba(22, 22, 22, 0.82);
+}
+html[data-theme="bitcoin-orange"] .text-white\/70 {
+  color: rgba(22, 22, 22, 0.72);
+}
+html[data-theme="bitcoin-orange"] .text-white\/60 {
+  color: rgba(22, 22, 22, 0.62);
+}
+html[data-theme="bitcoin-orange"] .text-white\/55 {
+  color: rgba(22, 22, 22, 0.55);
+}
+html[data-theme="bitcoin-orange"] .text-white\/50 {
+  color: rgba(22, 22, 22, 0.5);
+}
+html[data-theme="bitcoin-orange"] .text-white\/45 {
+  color: rgba(22, 22, 22, 0.45);
+}
+html[data-theme="bitcoin-orange"] .text-white\/40 {
+  color: rgba(22, 22, 22, 0.4);
+}
+html[data-theme="bitcoin-orange"] .text-white\/35 {
+  color: rgba(22, 22, 22, 0.35);
+}
+html[data-theme="bitcoin-orange"] .text-white\/30 {
+  color: rgba(22, 22, 22, 0.3);
+}
+html[data-theme="bitcoin-orange"] .placeholder-white\/40::placeholder {
+  color: rgba(22, 22, 22, 0.4);
+}
+html[data-theme="bitcoin-orange"] .bg-white\/10,
+html[data-theme="bitcoin-orange"] .bg-white\/5,
+html[data-theme="bitcoin-orange"] .bg-white-400\/20,
+html[data-theme="bitcoin-orange"] .bg-white-900\/30 {
+  background-color: rgba(255, 255, 255, 0.34);
+}
+html[data-theme="bitcoin-orange"] .hover\:bg-white\/10:hover,
+html[data-theme="bitcoin-orange"] .hover\:bg-white\/12:hover,
+html[data-theme="bitcoin-orange"] .hover\:bg-white\/20:hover {
+  background-color: rgba(247, 147, 26, 0.12);
+}
+html[data-theme="bitcoin-orange"] .border-white\/10,
+html[data-theme="bitcoin-orange"] .border-white\/20 {
+  border-color: rgba(40, 24, 8, 0.12);
+}
+html[data-theme="bitcoin-orange"] .hover\:text-white:hover {
+  color: #000000;
+}
+html[data-theme="bitcoin-orange"] .hover\:text-white\/80:hover,
+html[data-theme="bitcoin-orange"] .hover\:text-white\/60:hover {
+  color: rgba(0, 0, 0, 0.75);
+}
+
+/* Active chrome stays orange with white labels on the light theme. */
+html[data-theme="bitcoin-orange"] a[aria-current="page"],
+html[data-theme="bitcoin-orange"] [role="group"] > button[aria-pressed="true"] {
+  color: #ffffff !important;
 }
 
 body {

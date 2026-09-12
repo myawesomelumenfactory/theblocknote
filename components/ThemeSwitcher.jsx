@@ -11,7 +11,8 @@ export default function ThemeSwitcher() {
       <div
         role="group"
         aria-label={t('theme.switcher')}
-        className="mx-auto max-w-md flex items-center justify-center gap-1 rounded-2xl border border-[color:var(--theme-card-border)] bg-[color:var(--theme-card-bg)] backdrop-blur-xl p-1 shadow-lg"
+        className="mx-auto max-w-md flex items-center justify-center gap-1 rounded-2xl border border-[color:var(--theme-card-border)] bg-[color:var(--theme-card-bg)] p-1 shadow-[var(--theme-panel-shadow)]"
+        style={{ backdropFilter: 'blur(var(--theme-card-blur))', WebkitBackdropFilter: 'blur(var(--theme-card-blur))' }}
       >
         {themes.map((id) => {
           const active = theme === id
@@ -24,7 +25,7 @@ export default function ThemeSwitcher() {
               className={`flex-1 px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold tracking-wide transition-all duration-200 ${
                 active
                   ? 'bg-[color:var(--theme-nav-active-bg)] text-white border border-[color:var(--theme-nav-active-border)] shadow-[var(--theme-nav-active-shadow)]'
-                  : 'text-white/55 border border-transparent hover:text-white hover:bg-white/10'
+                  : 'text-[color:var(--theme-fg-muted)] border border-transparent hover:text-[color:var(--theme-fg)] hover:bg-[color:var(--theme-chip-bg)]'
               }`}
             >
               {t(THEME_META[id].nameKey)}
@@ -32,7 +33,7 @@ export default function ThemeSwitcher() {
           )
         })}
       </div>
-      <p className="mt-2 text-center text-[11px] text-white/35">{t('theme.hint')}</p>
+      <p className="mt-2 text-center text-[11px] text-[color:var(--theme-fg-subtle)]">{t('theme.hint')}</p>
     </div>
   )
 }
