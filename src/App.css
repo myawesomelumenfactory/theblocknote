@@ -112,7 +112,7 @@ html[data-theme="bitcoin-orange"] .hover\:text-white\/60:hover {
 
 /* Active chrome stays orange with white labels on the light theme. */
 html[data-theme="bitcoin-orange"] a[aria-current="page"],
-html[data-theme="bitcoin-orange"] [role="group"] > button[aria-pressed="true"] {
+html[data-theme="bitcoin-orange"] .chrome-toggle > button[aria-pressed="true"] {
   color: #ffffff !important;
 }
 
@@ -133,4 +133,35 @@ html, body, #root {
 .theme-glass {
   -webkit-backdrop-filter: blur(var(--theme-card-blur));
   backdrop-filter: blur(var(--theme-card-blur));
+}
+
+.compose-send-btn {
+  background-color: #000000 !important;
+  border-color: #000000 !important;
+}
+
+.compose-send-btn,
+.compose-send-btn span,
+.compose-send-btn svg {
+  color: #ffffff !important;
+  opacity: 1 !important;
+}
+
+.messages-sort-btn,
+.messages-sort-btn svg {
+  color: #000000 !important;
+}
+
+html[data-theme="deep-ledger"] .messages-sort-btn,
+html[data-theme="deep-ledger"] .messages-sort-btn svg {
+  color: #ffffff !important;
+}
+
+html[data-theme="deep-ledger"] .messages-sort-btn:not([aria-pressed="true"]) {
+  color: rgba(255, 255, 255, 0.55) !important;
+}
+
+html[data-theme="bitcoin-orange"] .messages-sort-btn:not([aria-pressed="true"]),
+html[data-theme="bitcoin-orange"] .messages-sort-btn:not([aria-pressed="true"]) svg {
+  color: rgba(0, 0, 0, 0.55) !important;
 }

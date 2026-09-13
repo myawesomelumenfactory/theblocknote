@@ -482,7 +482,7 @@ export default function LatestMessagesBlocks() {
           <div
             role="group"
             aria-label={t('messages.filter')}
-            className="flex shrink-0 items-center rounded-full border border-white/10 bg-white/5 p-0.5"
+            className="flex shrink-0 items-center rounded-full border border-[color:var(--theme-inset-border)] bg-[color:var(--theme-inset-bg)] p-0.5"
           >
             {sortModes.map((mode) => {
               const active = sortMode === mode.id;
@@ -493,10 +493,10 @@ export default function LatestMessagesBlocks() {
                   title={mode.title}
                   aria-pressed={active}
                   onClick={() => setSortMode(mode.id)}
-                  className={`flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium transition-colors ${
+                  className={`messages-sort-btn flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium transition-colors ${
                     active
-                      ? 'bg-white/15 text-white'
-                      : 'text-white/45 hover:text-white/80'
+                      ? 'bg-[color:var(--theme-chip-bg)] text-black'
+                      : 'text-black/55 hover:text-black'
                   }`}
                 >
                   {mode.id === 'latest' ? (

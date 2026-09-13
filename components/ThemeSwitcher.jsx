@@ -11,7 +11,7 @@ export default function ThemeSwitcher() {
       <div
         role="group"
         aria-label={t('theme.switcher')}
-        className="theme-glass mx-auto max-w-md flex items-center justify-center gap-1 rounded-2xl border border-[color:var(--theme-card-border)] bg-[color:var(--theme-card-bg)] p-1 shadow-[var(--theme-panel-shadow)]"
+        className="theme-glass chrome-toggle mx-auto max-w-md flex items-center justify-center gap-1 rounded-2xl border border-[color:var(--theme-card-border)] bg-[color:var(--theme-card-bg)] p-1 shadow-[var(--theme-panel-shadow)]"
       >
         {themes.map((id) => {
           const active = theme === id

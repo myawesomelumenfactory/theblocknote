@@ -23,7 +23,7 @@ export default function BitcoinQr({ value }) {
       height: SIZE,
       type: "svg",
       data: payload,
-      margin: 12,
+      margin: 0,
       qrOptions: { errorCorrectionLevel: "H" },
       dotsOptions: {
         color: "#000000",
@@ -32,6 +32,14 @@ export default function BitcoinQr({ value }) {
       },
       backgroundOptions: {
         color: "transparent",
+      },
+      cornersSquareOptions: {
+        color: "#000000",
+        type: "square",
+      },
+      cornersDotOptions: {
+        color: "#000000",
+        type: "square",
       },
     });
     qr.append(host);
@@ -47,7 +55,7 @@ export default function BitcoinQr({ value }) {
     <div title={payload}>
       <div
         ref={hostRef}
-        className="[&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
+        className="border-0 outline-none [&>svg]:block [&>svg]:h-auto [&>svg]:w-full [&>svg]:border-0 [&>svg]:outline-none"
         aria-label={t('spark.qrLabel')}
       />
     </div>

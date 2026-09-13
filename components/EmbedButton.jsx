@@ -19,22 +19,14 @@ export default function EmbedButton({
       whileHover={!disabled ? { scale: 1.01 } : {}}
       whileTap={!disabled ? { scale: 1.02 } : {}}
       className={`
-        text-white cursor-not-allowed font-medium rounded-lg text-sm px-5 py-2.5 text-center
-        relative w-full h-14 rounded-2xl font-semibold text-lg
-        transition-all duration-300 overflow-hidden theme-glass
+        compose-send-btn relative w-full h-14 rounded-2xl font-semibold text-lg text-center
+        transition-all duration-300 overflow-hidden border
         ${disabled || isLoading 
-          ? 'bg-[color:var(--theme-inset-bg)] text-white/45 cursor-not-allowed border border-[color:var(--theme-inset-border)]' 
-          : 'bg-[color:var(--theme-inset-bg)] text-white border border-[color:var(--theme-inset-border)] hover:bg-[color:var(--theme-chip-bg)] shadow-[var(--theme-panel-shadow)] cursor-pointer'
+          ? 'bg-black text-white border-black cursor-not-allowed' 
+          : 'bg-black text-white border-black hover:bg-black shadow-none cursor-pointer'
         }
       `}
     >
-      {/* Background glow effect */}
-      {!disabled && !isLoading && (
-        <div className="absolute inset-0 bg-gradient-to-r from-white-500 to-white-600 hover:opacity-20 transition-opacity duration-300 blur-xl"></div>
-      )}
-
-      
-      {/* Button content */}
       <div className="relative flex items-center justify-center gap-3">
         {isLoading ? (
           <>
@@ -48,11 +40,6 @@ export default function EmbedButton({
           </>
         )}
       </div>
-      
-      {/* Shimmer effect */}
-      {!disabled && !isLoading && (
-        <div className="absolute inset-0 -skew-x-12 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] hover:translate-x-[100%] transition-transform duration-1000"></div>
-      )}
     </motion.button>
   );
 }

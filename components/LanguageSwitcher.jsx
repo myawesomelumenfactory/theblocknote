@@ -19,7 +19,7 @@ export default function LanguageSwitcher({ onSelect }) {
     <div
       role="group"
       aria-label={t('lang.switcher')}
-      className="flex items-center rounded-xl border border-white/10 bg-white/5 p-0.5"
+      className="chrome-toggle flex items-center rounded-xl border border-white/10 bg-white/5 p-0.5"
     >
       <button
         type="button"
