@@ -1,7 +1,22 @@
 
 import { motion } from "framer-motion";
 import GlassCard from "../components/GlassCard";
-import { Activity, Copy, Check, Eye, EyeOff, ChevronLeft, ChevronRight, Trash2, Combine, Loader2 } from "lucide-react";
+import {
+    Zap,
+    KeyRound,
+    Coins,
+    Download,
+    Copy,
+    Check,
+    Eye,
+    EyeOff,
+    ChevronLeft,
+    ChevronRight,
+    Trash2,
+    Combine,
+    Loader2,
+    Plus,
+} from "lucide-react";
 
 import React, { useEffect, useState, useContext } from 'react';
 import BitcoinQr from "./QRCode";
@@ -164,6 +179,22 @@ export default function Load() {
         markCopied(id);
     };
 
+    const handleCopyAddress = async () => {
+        if (!address) return;
+        await copyText(address);
+        markCopied('address');
+    };
+
+    const handleGenerateAddress = () => {
+        const created = createParticipationKey();
+        applyKeys(
+            { ...savedKeys, [created.address]: created.privateKey },
+            created.address
+        );
+        setRevealed((current) => ({ ...current, [created.address]: false }));
+        if (refreshRefs) refreshRefs({ watch: true, address: created.address });
+    };
+
     const handleClearAllKeys = () => {
         clearStoredKeyPairs();
         window.location.reload();
@@ -296,369 +327,404 @@ export default function Load() {
             })}
             className="w-full px-4 sm:px-6 lg:px-8 pt-4 pb-16"
         >
-        {<GlassCard className="p-6 md:p-8">
-
-        <div className="flex items-center gap-3 mb-6">
-            <Activity className="w-6 h-6 text-orange-400" />
-            <h2 className="text-2xl font-bold text-white">{t('spark.loadTitle')} 
-            <span className="text-sm"> {t('spark.minAmount')}</span>
-            </h2>
-        </div>
-
-        {address && (
-        <div className="flex items-center justify-center mb-6">
-            <div className="w-[640px] max-w-[92vw]">
-                <BitcoinQr value={address} />
+        <div className="mb-6">
+            <div className="flex items-center gap-3 mb-2">
+                <Zap className="w-6 h-6 text-[color:var(--theme-accent)] shrink-0" />
+                <h1 className="text-2xl font-bold text-white">{t('spark.loadTitle')}</h1>
             </div>
-        </div>
-        )}
-        {address && (
-            <p className="text-center text-white/50 text-sm mb-6">
-                {t('spark.watching')}
+            <p className="text-white/60 text-sm">
+                {t('spark.minAmount')} · {t('spark.fundLead')}
             </p>
-        )}
-
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
-            <div className="flex items-center gap-3">
-                <Activity className="w-6 h-6 text-[color:var(--theme-accent)]" />
-                <h2 className="text-2xl font-bold text-white">{t('spark.keysTitle')}</h2>
-            </div>
-            <div className="flex flex-wrap items-center justify-end gap-2">
-                {fundedAddresses.length > 0 && (
-                    <button
-                        type="button"
-                        onClick={() => handleCopyKeys(fundedKeyPairs, 'all')}
-                        className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-white/10 text-white border border-white/10 hover:bg-white/20 transition-all duration-300"
-                    >
-                        {copied === 'all' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                        <span className="text-sm font-medium">
-                            {copied === 'all' ? t('spark.copiedAll') : t('spark.copyAll')}
-                        </span>
-                    </button>
-                )}
-                {savedAddresses.length > 0 && !confirmingClear && (
-                    <button
-                        type="button"
-                        onClick={() => setConfirmingClear(true)}
-                        className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-red-500/15 text-red-200 border border-red-400/30 hover:bg-red-500/25 transition-all duration-300"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                        <span className="text-sm font-medium">{t('spark.clearAll')}</span>
-                    </button>
-                )}
-                {confirmingClear && (
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                        <span className="text-sm text-orange-200">
-                            {t('spark.clearConfirm')}
-                        </span>
-                        <div className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={() => setConfirmingClear(false)}
-                                className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-white/10 text-white border border-white/10 hover:bg-white/20 transition-all duration-300"
-                            >
-                                <span className="text-sm font-medium">{t('spark.cancel')}</span>
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleClearAllKeys}
-                                className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-red-500/80 text-white border border-red-300/40 hover:bg-red-500 transition-all duration-300"
-                            >
-                                <Trash2 className="w-4 h-4" />
-                                <span className="text-sm font-medium">{t('spark.clearKeys')}</span>
-                            </button>
-                        </div>
-                    </div>
-                )}
-            </div>
         </div>
 
-        <p className="text-white/60 text-sm mb-6">
-            {t('spark.copyHint')}
-        </p>
+        <div className="flex flex-col lg:flex-row lg:items-start gap-6">
+            <div className="w-full lg:w-[40%] lg:sticky lg:top-4 lg:self-start lg:z-[5]">
+                <GlassCard className="p-5 md:p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                        <Zap className="w-5 h-5 text-[color:var(--theme-accent)] shrink-0" />
+                        <h2 className="text-xl font-bold text-white">{t('spark.fundTitle')}</h2>
+                    </div>
 
-        {isLoadingFunds && fundsProgress.total > 0 && (
-            <div className="mb-6">
-                <div className="flex justify-between gap-3 text-sm text-white/70 mb-2">
-                    <span>{progressLabel}</span>
-                    <span>{t('spark.fundedCount', { count: fundsProgress.funded })}</span>
-                </div>
-                <div className="h-2 rounded-full bg-white/10 overflow-hidden">
-                    <div
-                        className="h-full bg-orange-400/80 transition-all duration-300"
-                        style={{ width: `${progressPercent}%` }}
-                    />
-                </div>
-            </div>
-        )}
+                    {address && (
+                        <div className="mx-auto mb-5 w-full max-w-[220px] sm:max-w-[260px]">
+                            <BitcoinQr value={address} />
+                        </div>
+                    )}
 
-        {fundedAddresses.length > 0 && (
-            <div className="mb-8">
-            <div className="grid grid-cols-1 gap-4">
-                {pagedAddresses.map((savedAddress) => {
-                    const utxoSum = participationUnits
-                        .filter((unit) => unit.public_key === savedAddress)
-                        .reduce((sum, unit) => sum + (unit.value || 0), 0);
-                    const funds = addressFunds?.[savedAddress] || { received: utxoSum, available: utxoSum };
-                    return (
-                    <div key={savedAddress} className="glass-panel rounded-3xl p-5 border border-white/10 bg-white/5">
-                        <div className="flex items-start justify-between gap-3 mb-4">
+                    {address && (
+                        <div className="space-y-3">
                             <div>
-                                <div className="text-gray-400 text-xs mb-1">{t('spark.address')}</div>
-                                <div className="text-white text-sm font-mono break-all">{savedAddress}</div>
+                                <div className="text-white/45 text-xs mb-1">{t('spark.address')}</div>
+                                <p className="text-white text-sm font-mono break-all leading-relaxed">{address}</p>
                             </div>
-                            {funds.pending && (
-                                <span className="shrink-0 px-3 py-1 rounded-full text-xs font-semibold bg-orange-500/20 text-orange-300 border border-orange-400/30">
-                                    {t('spark.unconfirmed')}
+                            <button
+                                type="button"
+                                onClick={handleCopyAddress}
+                                className="flex w-full items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 text-white border border-white/10 hover:bg-white/20 transition-all duration-300"
+                            >
+                                {copied === 'address' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                                <span className="text-sm font-medium">
+                                    {copied === 'address' ? t('spark.addressCopied') : t('spark.copyAddress')}
                                 </span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleGenerateAddress}
+                                className="flex w-full items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 text-white border border-white/10 hover:bg-white/20 transition-all duration-300"
+                            >
+                                <Plus className="w-4 h-4" />
+                                <span className="text-sm font-medium">{t('spark.newAddress')}</span>
+                            </button>
+                            <p className="text-center text-white/50 text-sm leading-snug">
+                                {t('spark.watching')}
+                            </p>
+                        </div>
+                    )}
+                </GlassCard>
+            </div>
+
+            <div className="w-full lg:w-[60%] min-w-0 space-y-6">
+                <GlassCard className="p-5 md:p-6">
+                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 mb-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <KeyRound className="w-5 h-5 text-[color:var(--theme-accent)] shrink-0" />
+                            <h2 className="text-xl font-bold text-white">{t('spark.keysTitle')}</h2>
+                        </div>
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                            {fundedAddresses.length > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleCopyKeys(fundedKeyPairs, 'all')}
+                                    className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/10 text-white border border-white/10 hover:bg-white/20 transition-all duration-300"
+                                >
+                                    {copied === 'all' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                                    <span className="text-sm font-medium">
+                                        {copied === 'all' ? t('spark.copiedAll') : t('spark.copyAll')}
+                                    </span>
+                                </button>
+                            )}
+                            {savedAddresses.length > 0 && !confirmingClear && (
+                                <button
+                                    type="button"
+                                    onClick={() => setConfirmingClear(true)}
+                                    className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-red-500/15 text-red-200 border border-red-400/30 hover:bg-red-500/25 transition-all duration-300"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                    <span className="text-sm font-medium">{t('spark.clearAll')}</span>
+                                </button>
+                            )}
+                            {confirmingClear && (
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                                    <span className="text-sm text-orange-200">
+                                        {t('spark.clearConfirm')}
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setConfirmingClear(false)}
+                                            className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/10 text-white border border-white/10 hover:bg-white/20 transition-all duration-300"
+                                        >
+                                            <span className="text-sm font-medium">{t('spark.cancel')}</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleClearAllKeys}
+                                            className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-red-500/80 text-white border border-red-300/40 hover:bg-red-500 transition-all duration-300"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                            <span className="text-sm font-medium">{t('spark.clearKeys')}</span>
+                                        </button>
+                                    </div>
+                                </div>
                             )}
                         </div>
-                        <div className="mb-4">
-                            <div className="text-gray-400 text-xs mb-1">{t('spark.amountSent')}</div>
-                            <div className="text-2xl font-bold text-white">
-                                {formatSats(funds.received, locale)} SATS
+                    </div>
+
+                    <p className="text-white/60 text-sm mb-5">
+                        {t('spark.copyHint')}
+                    </p>
+
+                    {isLoadingFunds && fundsProgress.total > 0 && (
+                        <div className="mb-5">
+                            <div className="flex justify-between gap-3 text-sm text-white/70 mb-2">
+                                <span>{progressLabel}</span>
+                                <span>{t('spark.fundedCount', { count: fundsProgress.funded })}</span>
                             </div>
-                            <div className="text-gray-400 text-sm">
-                                ≈ {formatBtc(funds.received)} BTC
-                                {funds.unconfirmed > 0 ? ` · ${t('spark.satsUnconfirmed', { amount: formatSats(funds.unconfirmed, locale) })}` : ''}
-                                {funds.available !== funds.received ? ` · ${t('spark.satsAvailable', { amount: formatSats(funds.available, locale) })}` : ''}
+                            <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+                                <div
+                                    className="h-full bg-[color:var(--theme-accent-strong)]/80 transition-all duration-300"
+                                    style={{ width: `${progressPercent}%` }}
+                                />
                             </div>
                         </div>
-                        <div className="text-gray-400 text-xs mb-1">{t('spark.privateKey')}</div>
-                        <div className="text-white/80 text-sm font-mono break-all mb-4">
-                            {revealed[savedAddress] ? savedKeys[savedAddress] : '••••••••••••••••••••••••••••••••'}
+                    )}
+
+                    {fundedAddresses.length > 0 && (
+                        <div>
+                            <div className="grid grid-cols-1 gap-4">
+                                {pagedAddresses.map((savedAddress) => {
+                                    const utxoSum = participationUnits
+                                        .filter((unit) => unit.public_key === savedAddress)
+                                        .reduce((sum, unit) => sum + (unit.value || 0), 0);
+                                    const funds = addressFunds?.[savedAddress] || { received: utxoSum, available: utxoSum };
+                                    return (
+                                    <div key={savedAddress} className="rounded-2xl p-4 border border-[color:var(--theme-inset-border)] bg-[color:var(--theme-inset-bg)]">
+                                        <div className="flex items-start justify-between gap-3 mb-3">
+                                            <div className="min-w-0">
+                                                <div className="text-white/45 text-xs mb-1">{t('spark.address')}</div>
+                                                <div className="text-white text-sm font-mono break-all">{savedAddress}</div>
+                                            </div>
+                                            {funds.pending && (
+                                                <span className="shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold bg-[color:var(--theme-accent)]/15 text-[color:var(--theme-accent)] border border-[color:var(--theme-accent)]/30">
+                                                    {t('spark.unconfirmed')}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="mb-3">
+                                            <div className="text-white/45 text-xs mb-1">{t('spark.amountSent')}</div>
+                                            <div className="text-2xl font-bold text-white">
+                                                {formatSats(funds.received, locale)} SATS
+                                            </div>
+                                            <div className="text-white/50 text-sm">
+                                                ≈ {formatBtc(funds.received)} BTC
+                                                {funds.unconfirmed > 0 ? ` · ${t('spark.satsUnconfirmed', { amount: formatSats(funds.unconfirmed, locale) })}` : ''}
+                                                {funds.available !== funds.received ? ` · ${t('spark.satsAvailable', { amount: formatSats(funds.available, locale) })}` : ''}
+                                            </div>
+                                        </div>
+                                        <div className="text-white/45 text-xs mb-1">{t('spark.privateKey')}</div>
+                                        <div className="text-white/80 text-sm font-mono break-all mb-3">
+                                            {revealed[savedAddress] ? savedKeys[savedAddress] : '••••••••••••••••••••••••••••••••'}
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setRevealed((current) => ({ ...current, [savedAddress]: !current[savedAddress] }))}
+                                                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 text-white border border-white/10 hover:bg-white/20 transition-all duration-300"
+                                            >
+                                                {revealed[savedAddress] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                                <span className="text-sm">{revealed[savedAddress] ? t('spark.hide') : t('spark.show')}</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleCopyKeys({ [savedAddress]: savedKeys[savedAddress] }, savedAddress)}
+                                                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 text-white border border-white/10 hover:bg-white/20 transition-all duration-300"
+                                            >
+                                                {copied === savedAddress ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                                                <span className="text-sm">{copied === savedAddress ? t('spark.copied') : t('spark.copyThisKey')}</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    );
+                                })}
+                            </div>
+                            {fundedAddresses.length > PAGE_SIZE && (
+                                <div className="flex items-center justify-center gap-4 mt-5">
+                                    <button
+                                        type="button"
+                                        onClick={() => setPage(Math.max(0, currentPage - 1))}
+                                        disabled={currentPage === 0}
+                                        className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all duration-300 ${
+                                            currentPage === 0
+                                                ? 'bg-gray-200/12 text-gray-400 border-white/10 cursor-not-allowed'
+                                                : 'bg-white/10 text-white border-white/10 hover:bg-white/20 cursor-pointer'
+                                        }`}
+                                    >
+                                        <ChevronLeft className="w-4 h-4" />
+                                        <span className="text-sm">{t('spark.previous')}</span>
+                                    </button>
+                                    <span className="text-white/70 text-sm">
+                                        {currentPage + 1} / {totalPages}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setPage(Math.min(totalPages - 1, currentPage + 1))}
+                                        disabled={currentPage >= totalPages - 1}
+                                        className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all duration-300 ${
+                                            currentPage >= totalPages - 1
+                                                ? 'bg-gray-200/12 text-gray-400 border-white/10 cursor-not-allowed'
+                                                : 'bg-white/10 text-white border-white/10 hover:bg-white/20 cursor-pointer'
+                                        }`}
+                                    >
+                                        <span className="text-sm">{t('spark.next')}</span>
+                                        <ChevronRight className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            )}
                         </div>
-                        <div className="flex flex-wrap gap-2">
+                    )}
+
+                    {fundedAddresses.length === 0 && stillChecking && (
+                        <div className="rounded-2xl p-6 text-center border border-[color:var(--theme-inset-border)] bg-[color:var(--theme-inset-bg)]">
+                            <div className="text-white/80 text-base mb-1">{t('spark.lookingUp')}</div>
+                            <div className="text-white/50 text-sm">
+                                {progressLabel || t('spark.checkingChain')}
+                            </div>
+                        </div>
+                    )}
+
+                    {fundedAddresses.length === 0 && !stillChecking && (
+                        <div className="rounded-2xl p-6 text-center border border-[color:var(--theme-inset-border)] bg-[color:var(--theme-inset-bg)]">
+                            <div className="text-white/80 text-base mb-1">{t('spark.noFundedKeys')}</div>
+                            <div className="text-white/50 text-sm">
+                                {t('spark.keysHidden')}
+                            </div>
+                        </div>
+                    )}
+                </GlassCard>
+
+                <GlassCard className="p-5 md:p-6">
+                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 mb-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <Coins className="w-5 h-5 text-[color:var(--theme-accent)] shrink-0" />
+                            <h2 className="text-xl font-bold text-white">{t('spark.fundedUnits')}</h2>
+                        </div>
+                        {fundedUnits.length >= 2 && !confirmingConsolidate && (
                             <button
                                 type="button"
-                                onClick={() => setRevealed((current) => ({ ...current, [savedAddress]: !current[savedAddress] }))}
-                                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 text-white border border-white/10 hover:bg-white/20 transition-all duration-300"
+                                onClick={handleStartConsolidate}
+                                disabled={!canConsolidate}
+                                className={`flex items-center justify-center gap-2 px-3 py-2 rounded-xl border transition-all duration-300 ${
+                                    canConsolidate
+                                        ? 'bg-white/10 text-white border-white/10 hover:bg-white/20 cursor-pointer'
+                                        : 'bg-gray-200/12 text-gray-400 border-white/10 cursor-not-allowed'
+                                }`}
                             >
-                                {revealed[savedAddress] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                <span className="text-sm">{revealed[savedAddress] ? t('spark.hide') : t('spark.show')}</span>
+                                {consolidating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Combine className="w-4 h-4" />}
+                                <span className="text-sm font-medium">
+                                    {consolidating ? t('spark.consolidating') : t('spark.consolidate')}
+                                </span>
                             </button>
-                            <button
-                                type="button"
-                                onClick={() => handleCopyKeys({ [savedAddress]: savedKeys[savedAddress] }, savedAddress)}
-                                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 text-white border border-white/10 hover:bg-white/20 transition-all duration-300"
-                            >
-                                {copied === savedAddress ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                                <span className="text-sm">{copied === savedAddress ? t('spark.copied') : t('spark.copyThisKey')}</span>
-                            </button>
+                        )}
+                        {confirmingConsolidate && (
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                                <span className="text-sm text-orange-200">
+                                    {t('spark.consolidateConfirm', {
+                                        count: fundedUnits.length,
+                                        address: shortAddress(address),
+                                        fee: formatSats(consolidateFee, locale),
+                                    })}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setConfirmingConsolidate(false)}
+                                        disabled={consolidating}
+                                        className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/10 text-white border border-white/10 hover:bg-white/20 transition-all duration-300"
+                                    >
+                                        <span className="text-sm font-medium">{t('spark.cancel')}</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleConsolidate}
+                                        disabled={consolidating}
+                                        className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-[color:var(--theme-accent-strong)]/90 text-white border border-white/20 hover:opacity-95 transition-all duration-300"
+                                    >
+                                        {consolidating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Combine className="w-4 h-4" />}
+                                        <span className="text-sm font-medium">
+                                            {consolidating ? t('spark.consolidating') : t('spark.consolidate')}
+                                        </span>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {fundedUnits.length >= 2 && (
+                        <p className="text-white/60 text-sm mb-5">
+                            {t('spark.consolidateHint')}
+                        </p>
+                    )}
+                    {consolidateError && (
+                        <div className="p-4 mb-4 text-md text-red-800 rounded-lg bg-red-50 dark:bg-red-900/20 dark:text-red-300" role="alert">
+                            <span className="font-bold">{t('spark.error')}</span> {consolidateError}
                         </div>
+                    )}
+                    {consolidateTxId && (
+                        <div className="p-4 mb-5 text-md rounded-lg bg-white/5" role="status">
+                            <a
+                                href={`https://mempool.space/tx/${consolidateTxId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-white hover:text-white/80 font-bold text-center block"
+                            >
+                                {t('spark.consolidateSuccess').split('\n').map((line, index) => (
+                                    <span key={line}>
+                                        {index > 0 ? <br /> : null}
+                                        {line}
+                                    </span>
+                                ))}
+                            </a>
+                        </div>
+                    )}
+
+                    {participationUnits.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <AnimatePresence>
+                                {participationUnits.map((utxo, index) => (
+                                    <motion.div
+                                    key={`${utxo.tx_hash}:${utxo.tx_output}`}
+                                    initial={{ opacity: 0, scale: 0.9 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.9 }}
+                                    transition={{ 
+                                        delay: index * 0.05,
+                                        duration: 0.3,
+                                        ease: "easeOut"
+                                    }}
+                                    onClick={() => handleToggleSelection(index)}
+                                    >
+                                    <UTXOCard
+                                        utxo={utxo}
+                                        index={index}
+                                    />
+                                    </motion.div>
+                                ))}
+                            </AnimatePresence>
+                        </div>
+                    ) : (
+                        <div className="rounded-2xl p-6 text-center border border-[color:var(--theme-inset-border)] bg-[color:var(--theme-inset-bg)]">
+                            <div className="text-white/80 text-base mb-1">{t('spark.noUnits')}</div>
+                            <div className="text-white/50 text-sm">
+                                {t('spark.noUnitsHint')}
+                            </div>
+                        </div>
+                    )}
+                </GlassCard>
+
+                <GlassCard className="p-5 md:p-6">
+                    <div className="flex items-center gap-3 mb-2">
+                        <Download className="w-5 h-5 text-[color:var(--theme-accent)] shrink-0" />
+                        <h2 className="text-lg font-semibold text-white">{t('spark.importTitle')}</h2>
                     </div>
-                    );
-                })}
-            </div>
-            {fundedAddresses.length > PAGE_SIZE && (
-                <div className="flex items-center justify-center gap-4 mt-6">
-                    <button
-                        type="button"
-                        onClick={() => setPage(Math.max(0, currentPage - 1))}
-                        disabled={currentPage === 0}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all duration-300 ${
-                            currentPage === 0
-                                ? 'bg-gray-200/12 text-gray-400 border-white/10 cursor-not-allowed'
-                                : 'bg-white/10 text-white border-white/10 hover:bg-white/20 cursor-pointer'
-                        }`}
-                    >
-                        <ChevronLeft className="w-4 h-4" />
-                        <span className="text-sm">{t('spark.previous')}</span>
-                    </button>
-                    <span className="text-white/70 text-sm">
-                        {currentPage + 1} / {totalPages}
-                    </span>
-                    <button
-                        type="button"
-                        onClick={() => setPage(Math.min(totalPages - 1, currentPage + 1))}
-                        disabled={currentPage >= totalPages - 1}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all duration-300 ${
-                            currentPage >= totalPages - 1
-                                ? 'bg-gray-200/12 text-gray-400 border-white/10 cursor-not-allowed'
-                                : 'bg-white/10 text-white border-white/10 hover:bg-white/20 cursor-pointer'
-                        }`}
-                    >
-                        <span className="text-sm">{t('spark.next')}</span>
-                        <ChevronRight className="w-4 h-4" />
-                    </button>
-                </div>
-            )}
-            </div>
-        )}
-
-        {fundedAddresses.length === 0 && stillChecking && (
-            <div className="glass-panel rounded-3xl p-8 max-w-md mx-auto mb-8 text-center">
-                <div className="text-white/80 text-lg mb-2">{t('spark.lookingUp')}</div>
-                <div className="text-white/50 text-sm">
-                    {progressLabel || t('spark.checkingChain')}
-                </div>
-            </div>
-        )}
-
-        {fundedAddresses.length === 0 && !stillChecking && (
-            <div className="glass-panel rounded-3xl p-8 max-w-md mx-auto mb-8 text-center">
-                <div className="text-white/80 text-lg mb-2">{t('spark.noFundedKeys')}</div>
-                <div className="text-white/50 text-sm">
-                    {t('spark.keysHidden')}
-                </div>
-            </div>
-        )}
-
-        <div className="mb-10">
-            <h3 className="text-lg font-semibold text-white mb-2">{t('spark.importTitle')}</h3>
-            <p className="text-white/60 text-sm mb-4">
-                {t('spark.importHint')}
-            </p>
-            <textarea
-                value={importText}
-                onChange={(event) => setImportText(event.target.value)}
-                placeholder='{"version":1,"keys":[{"address":"...","privateKey":"..."}]}'
-                className="w-full h-36 px-4 py-3 mb-4 backdrop-blur-xl bg-white/10 rounded-2xl border border-white/20 text-white placeholder-white/40 resize-none focus:outline-none focus:border-white/50 font-mono text-sm"
-            />
-            <button
-                type="button"
-                onClick={handleImport}
-                disabled={!importText.trim()}
-                className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl border transition-all duration-300 ${
-                    importText.trim()
-                        ? 'bg-white/10 text-white border-white/10 hover:bg-white/20 cursor-pointer'
-                        : 'bg-gray-200/12 text-gray-200 border-white/10 cursor-not-allowed'
-                }`}
-            >
-                {t('spark.importButton')}
-            </button>
-            {importError && (
-                <div className="mt-4 p-4 text-md text-red-800 rounded-lg bg-red-50 dark:bg-red-900/20 dark:text-red-300" role="alert">
-                    <span className="font-bold">{t('spark.error')}</span> {importError}
-                </div>
-            )}
-        </div>
-   
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
-            <div className="flex items-center gap-3">
-                <Activity className="w-6 h-6 text-[color:var(--theme-accent)]" />
-                <h2 className="text-2xl font-bold text-white">{t('spark.fundedUnits')}</h2>
-            </div>
-            {fundedUnits.length >= 2 && !confirmingConsolidate && (
-                <button
-                    type="button"
-                    onClick={handleStartConsolidate}
-                    disabled={!canConsolidate}
-                    className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl border transition-all duration-300 ${
-                        canConsolidate
-                            ? 'bg-white/10 text-white border-white/10 hover:bg-white/20 cursor-pointer'
-                            : 'bg-gray-200/12 text-gray-400 border-white/10 cursor-not-allowed'
-                    }`}
-                >
-                    {consolidating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Combine className="w-4 h-4" />}
-                    <span className="text-sm font-medium">
-                        {consolidating ? t('spark.consolidating') : t('spark.consolidate')}
-                    </span>
-                </button>
-            )}
-            {confirmingConsolidate && (
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                    <span className="text-sm text-orange-200">
-                        {t('spark.consolidateConfirm', {
-                            count: fundedUnits.length,
-                            address: shortAddress(address),
-                            fee: formatSats(consolidateFee, locale),
-                        })}
-                    </span>
-                    <div className="flex items-center gap-2">
-                        <button
-                            type="button"
-                            onClick={() => setConfirmingConsolidate(false)}
-                            disabled={consolidating}
-                            className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-white/10 text-white border border-white/10 hover:bg-white/20 transition-all duration-300"
-                        >
-                            <span className="text-sm font-medium">{t('spark.cancel')}</span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleConsolidate}
-                            disabled={consolidating}
-                            className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-orange-500/80 text-white border border-orange-300/40 hover:bg-orange-500 transition-all duration-300"
-                        >
-                            {consolidating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Combine className="w-4 h-4" />}
-                            <span className="text-sm font-medium">
-                                {consolidating ? t('spark.consolidating') : t('spark.consolidate')}
-                            </span>
-                        </button>
-                    </div>
-                </div>
-            )}
-        </div>
-        {fundedUnits.length >= 2 && (
-            <p className="text-white/60 text-sm mb-6">
-                {t('spark.consolidateHint')}
-            </p>
-        )}
-        {consolidateError && (
-            <div className="p-4 mb-4 text-md text-red-800 rounded-lg bg-red-50 dark:bg-red-900/20 dark:text-red-300" role="alert">
-                <span className="font-bold">{t('spark.error')}</span> {consolidateError}
-            </div>
-        )}
-        {consolidateTxId && (
-            <div className="p-4 mb-6 text-md rounded-lg bg-gray-100/5" role="status">
-                <a
-                    href={`https://mempool.space/tx/${consolidateTxId}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-white hover:text-white/80 font-bold text-center block"
-                >
-                    {t('spark.consolidateSuccess').split('\n').map((line, index) => (
-                        <span key={line}>
-                            {index > 0 ? <br /> : null}
-                            {line}
-                        </span>
-                    ))}
-                </a>
-            </div>
-        )}
-
-        {participationUnits.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            <AnimatePresence>
-                {participationUnits.map((utxo, index) => (
-                    <motion.div
-                    key={`${utxo.tx_hash}:${utxo.tx_output}`}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    transition={{ 
-                        delay: index * 0.05,
-                        duration: 0.3,
-                        ease: "easeOut"
-                    }}
-                    onClick={() => handleToggleSelection(index)}
-                    >
-                    <UTXOCard
-                        utxo={utxo}
-                        index={index}
+                    <p className="text-white/60 text-sm mb-4">
+                        {t('spark.importHint')}
+                    </p>
+                    <textarea
+                        value={importText}
+                        onChange={(event) => setImportText(event.target.value)}
+                        placeholder='{"version":1,"keys":[{"address":"...","privateKey":"..."}]}'
+                        className="w-full h-28 px-4 py-3 mb-4 rounded-2xl border border-[color:var(--theme-inset-border)] bg-[color:var(--theme-inset-bg)] text-white placeholder-white/40 resize-none focus:outline-none focus:border-[color:var(--theme-card-border)] font-mono text-sm"
                     />
-                    </motion.div>
-                ))}
-                </AnimatePresence>
+                    <button
+                        type="button"
+                        onClick={handleImport}
+                        disabled={!importText.trim()}
+                        className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl border transition-all duration-300 ${
+                            importText.trim()
+                                ? 'bg-white/10 text-white border-white/10 hover:bg-white/20 cursor-pointer'
+                                : 'bg-gray-200/12 text-gray-200 border-white/10 cursor-not-allowed'
+                        }`}
+                    >
+                        {t('spark.importButton')}
+                    </button>
+                    {importError && (
+                        <div className="mt-4 p-4 text-md text-red-800 rounded-lg bg-red-50 dark:bg-red-900/20 dark:text-red-300" role="alert">
+                            <span className="font-bold">{t('spark.error')}</span> {importError}
+                        </div>
+                    )}
+                </GlassCard>
             </div>
-        )}
-
-        {participationUnits.length === 0 && (
-            <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center py-16"
-            >
-            <div className="glass-panel rounded-3xl p-8 max-w-md mx-auto">
-                <div className="text-black-400 text-lg mb-2">{t('spark.noUnits')}</div>
-                <div className="text-black-500 text-sm">
-                {t('spark.noUnitsHint')}
-                </div>
-            </div>
-            </motion.div>
-        )}
-
-        </GlassCard> }
+        </div>
         </motion.div>
     );
 }

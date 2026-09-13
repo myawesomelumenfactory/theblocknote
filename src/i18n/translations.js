@@ -148,6 +148,11 @@ export const translations = {
     spark: {
       loadTitle: 'Load bitcoins (units)',
       minAmount: '(min 0.00001 BTC)',
+      fundTitle: 'Send to participate',
+      fundLead: 'Scan the QR or copy the address, then send at least 0.00001 BTC.',
+      copyAddress: 'Copy address',
+      addressCopied: 'Address copied',
+      newAddress: 'Generate new address',
       watching: 'Watching for incoming bitcoin. Funded keys appear here automatically.',
       keysTitle: 'Participation Keys',
       copyAll: 'Copy all keys',
@@ -355,6 +360,11 @@ export const translations = {
     spark: {
       loadTitle: 'Charger des bitcoins (unités)',
       minAmount: '(min 0,00001 BTC)',
+      fundTitle: 'Envoyer pour participer',
+      fundLead: 'Scannez le QR ou copiez l’adresse, puis envoyez au moins 0,00001 BTC.',
+      copyAddress: 'Copier l’adresse',
+      addressCopied: 'Adresse copiée',
+      newAddress: 'Générer une nouvelle adresse',
       watching: 'Surveillance des bitcoins entrants. Les clés financées apparaissent ici automatiquement.',
       keysTitle: 'Clés de participation',
       copyAll: 'Copier toutes les clés',
