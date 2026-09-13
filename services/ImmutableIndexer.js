@@ -32,7 +32,7 @@ function esploraExplorer(name, base) {
   return { name, kind: 'esplora', base };
 }
 
-/** Tried in order. A skipped host is dropped for the rest of this process. */
+/** Tried in order. Rate-limits and timeouts skip a host briefly; auth errors skip it for this process. */
 function fallbackExplorers() {
   return [
     haskoinExplorer(),
@@ -61,7 +61,8 @@ function loadDotEnv() {
   }
 }
 
-const skippedExplorers = new Set();
+const PERMANENT_SKIP = Number.POSITIVE_INFINITY;
+const skippedUntil = new Map();
 
 function explorerNameFromUrl(url) {
   const value = String(url);
@@ -76,13 +77,29 @@ function explorerNameFromUrl(url) {
   return null;
 }
 
-function skipExplorer(name, reason) {
-  if (!name || skippedExplorers.has(name)) return;
-  skippedExplorers.add(name);
+function skipExplorer(name, reason, ms = 60_000) {
+  if (!name) return;
+  const until = ms === Infinity ? PERMANENT_SKIP : Date.now() + ms;
+  const prev = skippedUntil.get(name);
+  if (prev === PERMANENT_SKIP) return;
+  if (prev && prev > Date.now() && until !== PERMANENT_SKIP) {
+    if (until > prev) skippedUntil.set(name, until);
+    return;
+  }
+  skippedUntil.set(name, until);
   console.warn(`  ${name} ${reason}; using the next explorer`);
 }
 
-function getExplorers() {
+function isSkipped(name) {
+  const until = skippedUntil.get(name);
+  if (until == null) return false;
+  if (until === PERMANENT_SKIP) return true;
+  if (Date.now() < until) return true;
+  skippedUntil.delete(name);
+  return false;
+}
+
+function allExplorers() {
   const explorers = fallbackExplorers();
   if (process.env.BLOCKSTREAM_CLIENT_ID && process.env.BLOCKSTREAM_CLIENT_SECRET) {
     explorers.push({
@@ -91,11 +108,19 @@ function getExplorers() {
       base: ENTERPRISE_API,
     });
   }
-  const available = explorers.filter((row) => !skippedExplorers.has(row.name));
-  if (available.length) return available;
-  skippedExplorers.clear();
-  console.warn('  All explorers were skipped; retrying the full list');
   return explorers;
+}
+
+function getExplorers() {
+  const explorers = allExplorers();
+  const available = explorers.filter((row) => !isSkipped(row.name));
+  if (available.length) return available;
+  for (const [name, until] of skippedUntil) {
+    if (until !== PERMANENT_SKIP) skippedUntil.delete(name);
+  }
+  const retry = explorers.filter((row) => !isSkipped(row.name));
+  console.warn('  All explorers were skipped; retrying the fallback list');
+  return retry.length ? retry : explorers;
 }
 
 export function explorerChain() {
@@ -162,17 +187,17 @@ function abandonHost(url, statusOrError) {
   const name = explorerNameFromUrl(url);
   if (typeof statusOrError === 'number') {
     if (statusOrError === 429) {
-      skipExplorer(name, 'is rate-limited');
+      skipExplorer(name, 'is rate-limited', 120_000);
       return true;
     }
     if (statusOrError === 401 || statusOrError === 402 || statusOrError === 403) {
-      skipExplorer(name, 'unavailable');
+      skipExplorer(name, 'unavailable', Infinity);
       return true;
     }
     return false;
   }
   if (isConnectFailure(statusOrError)) {
-    skipExplorer(name, 'unreachable');
+    skipExplorer(name, 'unreachable', 30_000);
     return true;
   }
   return false;
@@ -219,7 +244,7 @@ async function fetchText(url, { retries = 6 } = {}) {
       return await response.text();
     } catch (error) {
       lastError = error;
-      if (abandonHost(url, error) || skippedExplorers.has(explorerNameFromUrl(url))) {
+      if (abandonHost(url, error) || isSkipped(explorerNameFromUrl(url))) {
         throw error;
       }
       if (error.status && !isRetryableHttpStatus(error.status)) {
@@ -275,7 +300,7 @@ async function fetchBuffer(url, { retries = 6 } = {}) {
       return Buffer.from(await response.arrayBuffer());
     } catch (error) {
       lastError = error;
-      if (abandonHost(url, error) || skippedExplorers.has(explorerNameFromUrl(url))) {
+      if (abandonHost(url, error) || isSkipped(explorerNameFromUrl(url))) {
         throw error;
       }
       if (error.status && !isRetryableHttpStatus(error.status)) {
@@ -410,31 +435,40 @@ async function fetchBlockViaHaskoin(explorer, height, options) {
   return extractFromBitcoinBlock(block, options);
 }
 
+async function fetchFromExplorer(explorer, height, options) {
+  if (explorer.kind === 'rawblock') {
+    return fetchBlockViaRaw(explorer, height, options);
+  }
+  if (explorer.kind === 'haskoin') {
+    return fetchBlockViaHaskoin(explorer, height, options);
+  }
+  try {
+    return await fetchBlockViaEsploraRaw(explorer, height, options);
+  } catch (rawError) {
+    if (isSkipped(explorer.name)) throw rawError;
+    console.warn(`  ${explorer.name} raw block failed at ${height}: ${rawError.message}`);
+    return fetchBlockViaEsplora(explorer, height, options);
+  }
+}
+
 async function fetchBlock(height, options) {
   let lastError;
 
-  for (const explorer of getExplorers(options)) {
-    try {
-      if (explorer.kind === 'rawblock') {
-        return await fetchBlockViaRaw(explorer, height, options);
-      }
-      if (explorer.kind === 'haskoin') {
-        return await fetchBlockViaHaskoin(explorer, height, options);
-      }
+  for (let round = 0; round < 12; round++) {
+    for (const explorer of getExplorers(options)) {
       try {
-        return await fetchBlockViaEsploraRaw(explorer, height, options);
-      } catch (rawError) {
-        if (skippedExplorers.has(explorer.name)) throw rawError;
-        console.warn(`  ${explorer.name} raw block failed at ${height}: ${rawError.message}`);
-        return await fetchBlockViaEsplora(explorer, height, options);
+        return await fetchFromExplorer(explorer, height, options);
+      } catch (error) {
+        lastError = error;
+        console.warn(`  ${explorer.name} failed at ${height}: ${error.message}`);
       }
-    } catch (error) {
-      lastError = error;
-      console.warn(`  ${explorer.name} failed at ${height}: ${error.message}`);
     }
+    const wait = Math.min(30_000, 1000 * 2 ** Math.min(round, 5));
+    console.warn(`  All explorers failed at ${height}; retry in ${wait}ms`);
+    await sleep(wait);
   }
 
-  throw lastError;
+  throw lastError || new Error(`All explorers failed at ${height}`);
 }
 
 async function fetchTipHeight(options = {}) {
