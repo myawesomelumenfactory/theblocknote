@@ -477,7 +477,17 @@ export default function LatestMessagesBlocks() {
       <div className="flex items-start justify-between gap-3 mb-6">
           <div className="flex items-center gap-3 min-w-0">
             <Activity className="w-6 h-6 text-[color:var(--theme-accent)] shrink-0" />
-            <h2 className="text-2xl font-bold text-white">{t('messages.title')}</h2>
+            <div className="min-w-0">
+              <h2 className="text-2xl font-bold text-white">{t('messages.title')}</h2>
+              {!loading && (
+                <p className="text-white/50 text-sm mt-0.5 tabular-nums" aria-live="polite">
+                  {t(
+                    visibleMessages.length === 1 ? 'messages.count' : 'messages.countPlural',
+                    { count: visibleMessages.length }
+                  )}
+                </p>
+              )}
+            </div>
           </div>
           <div
             role="group"

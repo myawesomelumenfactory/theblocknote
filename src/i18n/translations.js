@@ -114,6 +114,8 @@ export const translations = {
     messages: {
       title: 'Latest Messages',
       filter: 'Filter messages',
+      count: '{count} message',
+      countPlural: '{count} messages',
       latest: 'Latest',
       latestTitle: 'Newest messages first',
       up: 'Up',
@@ -319,6 +321,8 @@ export const translations = {
     messages: {
       title: 'Derniers messages',
       filter: 'Filtrer les messages',
+      count: '{count} message',
+      countPlural: '{count} messages',
       latest: 'Récents',
       latestTitle: 'Messages les plus récents d’abord',
       up: 'Pour',

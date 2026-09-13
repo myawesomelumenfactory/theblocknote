@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Type, AlertCircle } from "lucide-react";
 import { useLanguage } from "../src/i18n/LanguageContext";
+import { useTheme } from "../src/theme/ThemeContext";
 
 export default function TextInput({ 
   value, 
@@ -13,12 +14,14 @@ export default function TextInput({
   className = ""
 }) {
   const { t, lang } = useLanguage();
+  const { theme } = useTheme();
   const placeholders = placeholderOptions || t('compose.placeholders') || [];
   const [isFocused, setIsFocused] = useState(false);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const remainingChars = maxLength - value.length;
   const placeholder = placeholders[placeholderIndex % Math.max(placeholders.length, 1)] || "";
   const showPlaceholder = !value;
+  const feeIdleColor = theme === 'bitcoin-orange' ? '#000000' : '#ffffff80';
 
   useEffect(() => {
     setPlaceholderIndex(0);
@@ -86,7 +89,7 @@ export default function TextInput({
           <motion.div 
             className="absolute bottom-3 right-3 flex items-center gap-2"
             animate={{
-              color: remainingChars < 10 ? "#ef4444" : "#ffffff80"
+              color: remainingChars < 10 ? "#ef4444" : feeIdleColor
             }}
           >
           {remainingChars < 10 && (
