@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { explorerChain, parseArgs, runIndexer, runIndexerUntilTip } from '../services/ImmutableIndexer.js'
 import { publishImmutables } from '../services/immutables/publishImmutables.js'
+import { commitImmutablesSnapshot } from '../services/immutables/commitImmutables.js'
 import { handleLivePresence } from '../services/livePresence.js'
 
 const PROTOCOL_START = 906867
@@ -96,6 +97,23 @@ async function indexPass(options) {
     }
   } catch (error) {
     console.warn(`IPFS publish skipped: ${error.message}`)
+  }
+
+  if (result.caughtUp) {
+    const committed = commitImmutablesSnapshot(result)
+    if (committed.skipped) {
+      console.log(`Immutables git commit skipped: ${committed.reason}`)
+    } else {
+      console.log(
+        `Committed immutables snapshot ${committed.sha}${
+          committed.pushed
+            ? ' and pushed'
+            : committed.pushError
+              ? ` (push failed: ${committed.pushError})`
+              : ''
+        }`
+      )
+    }
   }
 
   return result

@@ -35,10 +35,10 @@ function esploraExplorer(name, base) {
 /** Tried in order. Rate-limits and timeouts skip a host briefly; auth errors skip it for this process. */
 function fallbackExplorers() {
   return [
-    haskoinExplorer(),
     esploraExplorer('mempool.space', 'https://mempool.space/api'),
-    esploraExplorer('blockstream', 'https://blockstream.info/api'),
     esploraExplorer('mempool.emzy.de', 'https://mempool.emzy.de/api'),
+    esploraExplorer('blockstream', 'https://blockstream.info/api'),
+    haskoinExplorer(),
     blockchainInfoExplorer(),
   ];
 }
@@ -578,7 +578,7 @@ Options:
   --overlap <n>       Re-scan the last n blocks before continuing to tip (default: 0)
   --max-blocks <n>    Stop after n blocks this pass (useful for CI)
   --until-tip         Keep scanning passes until chain tip or INDEX_DEADLINE_MS
-  --blockstream       Same fallback chain (haskoin → mempool.space → others)
+  --blockstream       Same fallback chain (mempool.space → others)
 
   npm run index:immutables
       One-shot, no HTTP server. Resumes the checkpoint, re-scans 8 blocks, writes
