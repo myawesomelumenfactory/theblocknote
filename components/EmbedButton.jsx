@@ -21,13 +21,12 @@ export default function EmbedButton({
       className={`
         text-white cursor-not-allowed font-medium rounded-lg text-sm px-5 py-2.5 text-center
         relative w-full h-14 rounded-2xl font-semibold text-lg
-        transition-all duration-300 overflow-hidden
+        transition-all duration-300 overflow-hidden theme-glass
         ${disabled || isLoading 
-          ? 'bg-gray-200/12 text-gray-200 cursor-not-allowed hover:shadow-xs' 
-          : 'bg-white/10 text-white hover:bg-white/12 shadow-md cursor-pointer'
+          ? 'bg-[color:var(--theme-inset-bg)] text-white/45 cursor-not-allowed border border-[color:var(--theme-inset-border)]' 
+          : 'bg-[color:var(--theme-inset-bg)] text-white border border-[color:var(--theme-inset-border)] hover:bg-[color:var(--theme-chip-bg)] shadow-[var(--theme-panel-shadow)] cursor-pointer'
         }
       `}
-    
     >
       {/* Background glow effect */}
       {!disabled && !isLoading && (

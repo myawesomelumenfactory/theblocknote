@@ -47,13 +47,14 @@ export default function TextInput({
           maxLength={maxLength}
           aria-label={placeholder || t('compose.writeMessage')}
           className={`
-            w-full h-32 pl-12 pr-4 py-4 
-            backdrop-blur-xl bg-white-900/10 rounded-2xl border border-white/20
+            theme-glass w-full h-32 pl-12 pr-4 py-4 
+            rounded-2xl border border-[color:var(--theme-inset-border)]
+            bg-[color:var(--theme-inset-bg)]
             text-base text-white resize-none
-            focus:outline-none focus:bg-white-900/20 focus:border-white-500/50
-            focus:shadow-[0_0_0_3px_rgba(255,165,0,0.1)]
+            focus:outline-none focus:bg-[color:var(--theme-chip-bg)] focus:border-[color:var(--theme-card-border)]
+            focus:shadow-[0_0_0_3px_rgba(247,147,26,0.12)]
             transition-all duration-300 font-medium
-            ${isFocused ? 'shadow-2xl' : ''}
+            ${isFocused ? 'shadow-[var(--theme-panel-shadow)]' : ''}
           `}
           style={{
             fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',

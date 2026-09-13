@@ -10,6 +10,7 @@ import HowItWorksPage from '../pages/HowItWorksPage';
 import LiveVisitBeacon from '../components/LiveVisitBeacon';
 import Header from '../components/Header';
 import ThemeSwitcher from '../components/ThemeSwitcher';
+import BitcoinBackgroundMark from '../components/BitcoinBackgroundMark';
 import { SharedContext } from '../src/SharedContext';
 import { fetchBalances, fetchTipHeight, fetchTxHex, fetchUnspents } from '../services/HaskoinStore';
 import { getHighestFundedUnit } from '../services/BitcoinService';
@@ -316,18 +317,21 @@ function App() {
       <SharedContext.Provider value={{ refs, setRefs, addressFunds, fundsProgress, currentIndex, setCurrentIndex, refreshRefs: fetchAddresses, ensureUtxoHex }}>
         <LiveVisitBeacon onCount={publishLiveCount} />
         <div className="h-screen flex flex-col bg-[image:var(--theme-bg)] text-white relative overflow-hidden">
-              <Header />
-              <div className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto">
-                <Routes>
-                  <Route path="/" element={<MainPage />} />
-                  <Route path="/power" element={<PowerPage />} />
-                  <Route path="/read" element={<ReadPage />} />
-                  <Route path="/generate" element={<GeneratePage />} />
-                  <Route path="/status" element={<StatusPage />} />
-                  <Route path="/how-it-works" element={<HowItWorksPage />} />
-                </Routes>
+              <BitcoinBackgroundMark opacity={0.2} />
+              <div className="relative z-10 flex min-h-0 flex-1 flex-col">
+                <Header />
+                <div className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto">
+                  <Routes>
+                    <Route path="/" element={<MainPage />} />
+                    <Route path="/power" element={<PowerPage />} />
+                    <Route path="/read" element={<ReadPage />} />
+                    <Route path="/generate" element={<GeneratePage />} />
+                    <Route path="/status" element={<StatusPage />} />
+                    <Route path="/how-it-works" element={<HowItWorksPage />} />
+                  </Routes>
+                </div>
+                <ThemeSwitcher />
               </div>
-              <ThemeSwitcher />
         </div>
       </SharedContext.Provider>
     </>

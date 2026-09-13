@@ -11,11 +11,10 @@ export default function GlassCard({
   return (
     <div
       className={`
-      bg-[color:var(--theme-card-bg)] rounded-3xl border border-[color:var(--theme-card-border)]
+      theme-glass bg-[color:var(--theme-card-bg)] rounded-3xl border border-[color:var(--theme-card-border)]
       shadow-[var(--theme-panel-shadow)] hover:shadow-[var(--theme-panel-shadow)] transition-all duration-300
         ${className}
       `}
-      style={{ backdropFilter: 'blur(var(--theme-card-blur))', WebkitBackdropFilter: 'blur(var(--theme-card-blur))' }}
     >
       {children}
     </div>
