@@ -147,6 +147,17 @@ html, body, #root {
   opacity: 1 !important;
 }
 
+html[data-theme="deep-ledger"] .compose-send-btn {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+html[data-theme="deep-ledger"] .compose-send-btn,
+html[data-theme="deep-ledger"] .compose-send-btn span,
+html[data-theme="deep-ledger"] .compose-send-btn svg {
+  color: #000000 !important;
+}
+
 .messages-sort-btn,
 .messages-sort-btn svg {
   color: #000000 !important;

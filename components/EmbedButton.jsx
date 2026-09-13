@@ -20,11 +20,8 @@ export default function EmbedButton({
       whileTap={!disabled ? { scale: 1.02 } : {}}
       className={`
         compose-send-btn relative w-full h-14 rounded-2xl font-semibold text-lg text-center
-        transition-all duration-300 overflow-hidden border
-        ${disabled || isLoading 
-          ? 'bg-black text-white border-black cursor-not-allowed' 
-          : 'bg-black text-white border-black hover:bg-black shadow-none cursor-pointer'
-        }
+        transition-all duration-300 overflow-hidden border shadow-none
+        ${disabled || isLoading ? 'cursor-not-allowed' : 'cursor-pointer'}
       `}
     >
       <div className="relative flex items-center justify-center gap-3">

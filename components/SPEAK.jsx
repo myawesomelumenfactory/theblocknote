@@ -15,27 +15,25 @@ const intro = {
 
 export default function Speak() {
   return (
-    <div>
-
-        <motion.div
-              {...windowMotion(intro)}
-              className="w-full"
-          >
-          {<GlassCard className="p-6 md:p-8 mb-6">
-            <Introduction />
-          </GlassCard> }
-        </motion.div>
-
-        <motion.div
-            {...windowMotion(intro)}
-            className="w-full"
-        >
-        {<GlassCard className="p-6 md:p-8">
-            <Compose />
-        </GlassCard> }
-        <LiveStatusSentence className="text-white/80 text-lg md:text-xl font-medium text-center mt-4 leading-tight" />
+    <div className="w-full">
+      <motion.div
+        {...windowMotion(intro)}
+        className="w-full"
+      >
+        <GlassCard className="p-6 md:p-8 mb-6">
+          <Introduction />
+        </GlassCard>
       </motion.div>
 
+      <motion.div
+        {...windowMotion(intro)}
+        className="w-full"
+      >
+        <GlassCard className="p-6 md:p-8">
+          <Compose />
+        </GlassCard>
+        <LiveStatusSentence className="text-white/80 text-lg md:text-xl font-medium text-center mt-4 leading-tight" />
+      </motion.div>
     </div>
   );
 }
