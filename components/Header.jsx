@@ -10,7 +10,7 @@ import { useLanguage } from "../src/i18n/LanguageContext";
 import { useImmutablesProgress } from "../services/ImmutablesStore";
 
 const navClass = ({ isActive }) =>
-  `flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300 border ${
+  `flex w-full md:w-auto items-center justify-center md:justify-start gap-2 px-4 py-3 md:py-2 rounded-xl transition-all duration-300 border ${
     isActive
       ? 'bg-[color:var(--theme-nav-active-bg)] text-white border-[color:var(--theme-nav-active-border)] shadow-[var(--theme-nav-active-shadow)]'
       : 'bg-white-400/20 text-white/70 border-white/10 hover:text-white hover:bg-white/10'
@@ -76,7 +76,7 @@ export default function Header() {
               <div
                 className={`${
                   mobileMenuOpen ? "flex" : "hidden"
-                } flex-col md:flex md:flex-row items-start md:items-center gap-2 md:gap-3`}
+                } w-full flex-col md:flex md:w-auto md:flex-row items-stretch md:items-center gap-2 md:gap-3`}
               >
                 <div className="md:hidden w-full flex justify-center py-3 mb-1 border-b border-white/10">
                   <BitcoinLogo
@@ -117,12 +117,14 @@ export default function Header() {
                 <Link
                   to="https://bitcoin.org/bitcoin.pdf"
                   target="_blank"
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300 bg-white-400/20 text-white/70 border border-white/10 hover:text-white hover:bg-white/10"
+                  className="flex w-full md:w-auto items-center justify-center md:justify-start gap-2 px-4 py-3 md:py-2 rounded-xl transition-all duration-300 bg-white-400/20 text-white/70 border border-white/10 hover:text-white hover:bg-white/10"
                 >
                   <span className="font-medium">{t('nav.about')}</span>
                 </Link>
-                <LanguageSwitcher onSelect={() => setMobileMenuOpen(false)} />
-                <div className="px-3 py-1 md:py-0">
+                <div className="flex w-full md:w-auto justify-center md:justify-start py-1">
+                  <LanguageSwitcher onSelect={() => setMobileMenuOpen(false)} />
+                </div>
+                <div className="flex w-full md:w-auto justify-center md:justify-start px-3 py-1 md:py-0">
                   <ChainTip />
                 </div>
               </div>
