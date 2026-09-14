@@ -830,17 +830,17 @@ export default function LatestMessagesBlocks() {
                             key={`${comment.txid}-${comment.time}`}
                             className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2"
                           >
-                            <p className="text-white text-sm mb-1">{comment.text}</p>
-                            <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-start justify-between gap-3">
                               <a
                                 href={explorerTxUrl(comment.txid)}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="font-mono text-xs text-white/70 hover:text-white break-all underline decoration-white/20 hover:decoration-white/60"
+                                title={t('messages.viewTx')}
+                                className="text-white text-sm hover:text-white/80 underline decoration-white/25 hover:decoration-white/60"
                               >
-                                {comment.txid}
+                                {comment.text}
                               </a>
-                              <span className="text-white/40 text-xs shrink-0">{formatTimestampToUTC(comment.time)}</span>
+                              <span className="text-white/40 text-xs shrink-0 pt-0.5">{formatTimestampToUTC(comment.time)}</span>
                             </div>
                           </li>
                         ))
