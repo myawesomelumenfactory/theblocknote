@@ -3,7 +3,7 @@ import fsSync from 'node:fs';
 import path from 'node:path';
 import bitcoinjs from 'bitcoinjs-lib';
 import { decodeOpReturn } from './TheBlockNote.js';
-import { isProtocolMessage, recordsFromEsploraTxs } from './immutableProtocol.js';
+import { isProtocolMessage, parseProtocolValue, recordsFromEsploraTxs } from './immutableProtocol.js';
 
 const { Block } = bitcoinjs;
 
@@ -337,10 +337,12 @@ function extractFromBlockchainInfoBlock(block, { protocolOnly }) {
       if (!value) return;
       if (protocolOnly && !isProtocolMessage(value)) return;
 
+      const parsed = parseProtocolValue(value);
       records.push({
         index: `${txid}_${out.n ?? index}`,
         time,
         value,
+        ...(parsed?.kind ? { kind: parsed.kind } : {}),
       });
     });
   }
@@ -364,10 +366,12 @@ function extractFromBitcoinBlock(block, { protocolOnly }) {
       const value = decodeOpReturn(Buffer.from(script).toString('hex'));
       if (!value) return;
       if (protocolOnly && !isProtocolMessage(value)) return;
+      const parsed = parseProtocolValue(value);
       records.push({
         index: `${txid}_${index}`,
         time,
         value,
+        ...(parsed?.kind ? { kind: parsed.kind } : {}),
       });
     });
   }

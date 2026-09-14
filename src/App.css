@@ -176,3 +176,11 @@ html[data-theme="bitcoin-orange"] .messages-sort-btn:not([aria-pressed="true"]),
 html[data-theme="bitcoin-orange"] .messages-sort-btn:not([aria-pressed="true"]) svg {
   color: rgba(0, 0, 0, 0.55) !important;
 }
+
+html[data-theme="bitcoin-orange"] .messages-vote-btn:not(:disabled) {
+  border-color: rgba(40, 24, 8, 0.22) !important;
+}
+
+html[data-theme="bitcoin-orange"] .messages-vote-btn:disabled {
+  border-color: rgba(40, 24, 8, 0.1) !important;
+}

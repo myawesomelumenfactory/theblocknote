@@ -3,6 +3,7 @@ import * as ecc from 'tiny-secp256k1';
 import ECPairFactory from 'ecpair';
 import * as bitcoin from 'bitcoinjs-lib';
 import { encode } from '../services/TheBlockNote';
+import { encodeComment, cleanCommentText, COMMENT_TEXT_MAX } from './immutableProtocol.js';
 import { estimateConsolidationFee, isValidAddress } from './BitcoinUtils';
 
 const ECPair = ECPairFactory(ecc);
@@ -478,6 +479,42 @@ export async function sendBitcoinTransaction(utxo, message, fee = 450) {
       success: false,
       error: error.message,
       rawTxHex: error.rawTxHex || null
+    };
+  }
+}
+
+/**
+ * Comment on a message (topic reply).
+ * Protocol: t 0 2 <txid12> <vout> "<text≤50>"
+ */
+export async function applyComment(utxo, hash, index, text, fee = 450) {
+  try {
+    const cleaned = cleanCommentText(text);
+    if (!cleaned) {
+      throw new Error('Comment is empty');
+    }
+    if (cleaned.length > COMMENT_TEXT_MAX) {
+      throw new Error(`Comment must be ${COMMENT_TEXT_MAX} characters or fewer`);
+    }
+
+    const encoded = encodeComment(hash, index, cleaned);
+    const rawTxHex = await createTransaction(utxo, encoded, fee);
+    const transactionId = await broadcastTransaction(rawTxHex);
+
+    return {
+      success: true,
+      transactionId: transactionId.replace(/[^a-f0-9]/gi, ''),
+      rawTxHex,
+      encoded,
+      text: cleaned,
+      explorerUrl: `https://mempool.space/tx/${transactionId.replace(/[^a-f0-9]/gi, '')}`,
+    };
+  } catch (error) {
+    console.error('Comment failed:', error.message);
+    return {
+      success: false,
+      error: error.message,
+      rawTxHex: error.rawTxHex || null,
     };
   }
 }

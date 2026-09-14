@@ -2,9 +2,14 @@ import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } 
 import { motion } from "framer-motion";
 import GlassCard from "./GlassCard";
 import { decodeOpReturn } from '../services/TheBlockNote';
-import { Activity, ChevronUp, ChevronDown, Clock, List, Loader2 } from "lucide-react";
-import { applyVoteUp, applyVoteDown, getHighestFundedUnit } from '../services/BitcoinService';
+import { Activity, ChevronUp, ChevronDown, Clock, List, Loader2, MessageCircle } from "lucide-react";
+import { applyVoteUp, applyVoteDown, applyComment, getHighestFundedUnit } from '../services/BitcoinService';
 import { appendImmutable, loadImmutableRecords } from '../services/ImmutablesStore';
+import {
+  COMMENT_TEXT_MAX,
+  commentBelongsToMessage,
+  parseCommentValue,
+} from '../services/immutableProtocol';
 import immutablesData, { immutablesState } from 'virtual:immutables';
 import { SharedContext } from '../src/SharedContext';
 import { windowMotion } from '../services/introMotion';
@@ -21,7 +26,10 @@ export default function LatestMessagesBlocks() {
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
   const [voteNotice, setVoteNotice] = useState(null);
   const [votingIndex, setVotingIndex] = useState(null);
+  const [commentingIndex, setCommentingIndex] = useState(null);
   const [openVoteLists, setOpenVoteLists] = useState(() => new Set());
+  const [openCommentLists, setOpenCommentLists] = useState(() => new Set());
+  const [commentDrafts, setCommentDrafts] = useState({});
   const [loading, setLoading] = useState(true);
   const [sortMode, setSortMode] = useState('latest');
   const { refs, ensureUtxoHex, refreshRefs } = useContext(SharedContext);
@@ -58,6 +66,15 @@ export default function LatestMessagesBlocks() {
 
   function toggleVoteList(messageIndex) {
     setOpenVoteLists((prev) => {
+      const next = new Set(prev);
+      if (next.has(messageIndex)) next.delete(messageIndex);
+      else next.add(messageIndex);
+      return next;
+    });
+  }
+
+  function toggleCommentList(messageIndex) {
+    setOpenCommentLists((prev) => {
       const next = new Set(prev);
       if (next.has(messageIndex)) next.delete(messageIndex);
       else next.add(messageIndex);
@@ -131,6 +148,75 @@ export default function LatestMessagesBlocks() {
 
   const handleVoteUp = (messageIndex) => handleVote(messageIndex, 'up');
   const handleVoteDown = (messageIndex) => handleVote(messageIndex, 'down');
+
+  const handleComment = async (messageIndex) => {
+    const draft = String(commentDrafts[messageIndex] || '').trim();
+    if (!draft) {
+      setVoteNotice({ type: 'error', text: t('messages.commentEmpty') });
+      return;
+    }
+
+    const selectedUnit = getHighestFundedUnit(Array.isArray(refs) ? refs : [], 450);
+    if (!selectedUnit) {
+      setVoteNotice({ type: 'error', text: t('messages.commentBefore') });
+      return;
+    }
+
+    setCommentingIndex(messageIndex);
+    setVoteNotice(null);
+
+    try {
+      const parts = messageIndex.split('_');
+      const hash = parts[0];
+      const vout = parts[1];
+      const utxo = ensureUtxoHex ? await ensureUtxoHex(selectedUnit.index) : selectedUnit;
+      const result = await applyComment(utxo, hash, vout, draft, 450);
+
+      if (!result.success) {
+        setVoteNotice({ type: 'error', text: result.error || t('messages.commentFailed') });
+        return;
+      }
+
+      const cleaned = result.text || draft.replace(/"/g, '').replace(/\s+/g, ' ').trim().slice(0, COMMENT_TEXT_MAX);
+      await appendImmutable({
+        index: `${result.transactionId}_0`,
+        time: Math.floor(Date.now() / 1000),
+        value: result.encoded,
+        kind: 'comment',
+      });
+
+      const newComment = {
+        txid: result.transactionId,
+        time: Math.floor(Date.now() / 1000),
+        text: cleaned,
+      };
+
+      setTheBlockNote((prev) =>
+        prev.map((msg) =>
+          msg.index === messageIndex
+            ? {
+                ...msg,
+                comments: [...(msg.comments || []), newComment],
+              }
+            : msg
+        )
+      );
+      setCommentDrafts((prev) => ({ ...prev, [messageIndex]: '' }));
+      setOpenCommentLists((prev) => new Set([...prev, messageIndex]));
+      setVoteNotice({
+        type: 'success',
+        text: t('messages.commentRecorded'),
+        url: result.explorerUrl,
+      });
+      if (refreshRefs) {
+        await refreshRefs({ watch: true, address: selectedUnit.public_key });
+      }
+    } catch (error) {
+      setVoteNotice({ type: 'error', text: error.message || t('messages.commentFailed') });
+    } finally {
+      setCommentingIndex(null);
+    }
+  };
 
   function loadMessages() {
     console.log('--- CURRENT BLOCK HEX ---');
@@ -294,6 +380,7 @@ export default function LatestMessagesBlocks() {
     var messages = await fetchMessages();
     var downs   = [];
     var ups     = [];
+    var comments = [];
     var theblocknote = [];
 
     messages.forEach((m) => {
@@ -318,7 +405,8 @@ export default function LatestMessagesBlocks() {
             "value": message,
             "downs": 0,
             "ups": 0,
-            "votes": []
+            "votes": [],
+            "comments": []
           });
        }
 
@@ -340,6 +428,19 @@ export default function LatestMessagesBlocks() {
             "time": m.time,
             "hash": hash,
             "index": parseInt(index),
+            "txid": voteTxidFromIndex(m.index)
+          });
+        }
+
+        if ( type == 2 ) {
+          const parsed = parseCommentValue(m.value);
+          if (!parsed) return;
+          comments.push({
+            "time": m.time,
+            "prefix": parsed.prefix,
+            "prefixRaw": parsed.prefixRaw,
+            "vout": parsed.vout,
+            "text": parsed.text,
             "txid": voteTxidFromIndex(m.index)
           });
         }
@@ -375,7 +476,19 @@ export default function LatestMessagesBlocks() {
           });
         }
       });
+
+      comments.forEach((comment) => {
+        if (commentBelongsToMessage(comment, m.index)) {
+          m.comments.push({
+            txid: comment.txid,
+            time: comment.time,
+            text: comment.text,
+          });
+        }
+      });
+
       m.votes.sort((a, b) => b.time - a.time);
+      m.comments.sort((a, b) => a.time - b.time);
     })
 
     theblocknote.sort((a, b) => b.time - a.time);
@@ -611,7 +724,7 @@ export default function LatestMessagesBlocks() {
                   disabled={!hasFundedUnit || votingIndex === msg.index}
                   title={!hasFundedUnit ? t('messages.loadToVote') : t('messages.voteUp')}
                   className={`
-                    flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200
+                    messages-vote-btn flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200 border border-transparent
                     ${!hasFundedUnit || votingIndex === msg.index
                       ? 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
                       : 'bg-white/10 text-white hover:bg-green-500/20 hover:text-green-400 hover:scale-105'
@@ -629,7 +742,7 @@ export default function LatestMessagesBlocks() {
                   disabled={!hasFundedUnit || votingIndex === msg.index}
                   title={!hasFundedUnit ? t('messages.loadToVote') : t('messages.voteDown')}
                   className={`
-                    flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200
+                    messages-vote-btn flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200 border border-transparent
                     ${!hasFundedUnit || votingIndex === msg.index
                       ? 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
                       : 'bg-white/10 text-white hover:bg-red-500/20 hover:text-red-400 hover:scale-105'
@@ -642,21 +755,39 @@ export default function LatestMessagesBlocks() {
               </div>
 
               <div className="pt-1">
-                <button
-                  type="button"
-                  onClick={() => toggleVoteList(msg.index)}
-                  aria-expanded={openVoteLists.has(msg.index)}
-                  className="flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors"
-                >
-                  <List className="w-4 h-4" />
-                  <span>
-                    {openVoteLists.has(msg.index) ? t('messages.hideVotes') : t('messages.showVotes')}
-                    {` (${(msg.votes || []).length})`}
-                  </span>
-                  <ChevronDown
-                    className={`w-4 h-4 transition-transform ${openVoteLists.has(msg.index) ? 'rotate-180' : ''}`}
-                  />
-                </button>
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleVoteList(msg.index)}
+                    aria-expanded={openVoteLists.has(msg.index)}
+                    className="flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors"
+                  >
+                    <List className="w-4 h-4" />
+                    <span>
+                      {openVoteLists.has(msg.index) ? t('messages.hideVotes') : t('messages.showVotes')}
+                      {` (${(msg.votes || []).length})`}
+                    </span>
+                    <ChevronDown
+                      className={`w-4 h-4 transition-transform ${openVoteLists.has(msg.index) ? 'rotate-180' : ''}`}
+                    />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => toggleCommentList(msg.index)}
+                    aria-expanded={openCommentLists.has(msg.index)}
+                    className="flex items-center gap-2 text-sm text-white/60 hover:text-white transition-colors"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    <span>
+                      {openCommentLists.has(msg.index) ? t('messages.hideComments') : t('messages.showComments')}
+                      {` (${(msg.comments || []).length})`}
+                    </span>
+                    <ChevronDown
+                      className={`w-4 h-4 transition-transform ${openCommentLists.has(msg.index) ? 'rotate-180' : ''}`}
+                    />
+                  </button>
+                </div>
 
                 {openVoteLists.has(msg.index) && (
                   <ul className="mt-3 space-y-2">
@@ -686,6 +817,94 @@ export default function LatestMessagesBlocks() {
                       ))
                     )}
                   </ul>
+                )}
+
+                {openCommentLists.has(msg.index) && (
+                  <div className="mt-3 space-y-3">
+                    <ul className="space-y-2">
+                      {(msg.comments || []).length === 0 ? (
+                        <li className="text-white/40 text-sm">{t('messages.noComments')}</li>
+                      ) : (
+                        (msg.comments || []).map((comment) => (
+                          <li
+                            key={`${comment.txid}-${comment.time}`}
+                            className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2"
+                          >
+                            <p className="text-white text-sm mb-1">{comment.text}</p>
+                            <div className="flex items-center justify-between gap-3">
+                              <a
+                                href={explorerTxUrl(comment.txid)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-mono text-xs text-white/70 hover:text-white break-all underline decoration-white/20 hover:decoration-white/60"
+                              >
+                                {comment.txid}
+                              </a>
+                              <span className="text-white/40 text-xs shrink-0">{formatTimestampToUTC(comment.time)}</span>
+                            </div>
+                          </li>
+                        ))
+                      )}
+                    </ul>
+
+                    <div className="flex flex-col gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <input
+                          type="text"
+                          value={commentDrafts[msg.index] || ''}
+                          maxLength={COMMENT_TEXT_MAX}
+                          onChange={(event) =>
+                            setCommentDrafts((prev) => ({
+                              ...prev,
+                              [msg.index]: event.target.value.slice(0, COMMENT_TEXT_MAX),
+                            }))
+                          }
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                              event.preventDefault();
+                              handleComment(msg.index);
+                            }
+                          }}
+                          placeholder={t('messages.commentPlaceholder')}
+                          disabled={!hasFundedUnit || commentingIndex === msg.index}
+                          className="flex-1 min-w-0 px-3 py-2 rounded-xl border border-[color:var(--theme-inset-border)] bg-[color:var(--theme-inset-bg)] text-white text-sm placeholder-white/40 focus:outline-none focus:border-[color:var(--theme-card-border)] disabled:opacity-50"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleComment(msg.index)}
+                          disabled={
+                            !hasFundedUnit ||
+                            commentingIndex === msg.index ||
+                            !(commentDrafts[msg.index] || '').trim()
+                          }
+                          title={!hasFundedUnit ? t('messages.loadToComment') : t('messages.commentSend')}
+                          className={`shrink-0 px-4 py-2 rounded-xl border text-sm font-medium transition-colors ${
+                            !hasFundedUnit ||
+                            commentingIndex === msg.index ||
+                            !(commentDrafts[msg.index] || '').trim()
+                              ? 'bg-gray-500/20 text-gray-400 border-white/10 cursor-not-allowed'
+                              : 'bg-white/10 text-white border-white/10 hover:bg-white/20'
+                          }`}
+                        >
+                          {commentingIndex === msg.index ? t('messages.commentSending') : t('messages.commentSend')}
+                        </button>
+                      </div>
+                      <div className="flex justify-end">
+                        <span
+                          className={`text-xs tabular-nums ${
+                            COMMENT_TEXT_MAX - (commentDrafts[msg.index] || '').length < 10
+                              ? 'text-red-400'
+                              : 'text-white/45'
+                          }`}
+                        >
+                          {t('messages.commentLimit', {
+                            remaining: COMMENT_TEXT_MAX - (commentDrafts[msg.index] || '').length,
+                            max: COMMENT_TEXT_MAX,
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
