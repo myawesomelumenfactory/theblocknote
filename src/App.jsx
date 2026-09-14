@@ -8,7 +8,6 @@ import GeneratePage from '../pages/GeneratePage';
 import StatusPage from '../pages/StatusPage';
 import DirectMessagePage from '../pages/DirectMessagePage';
 import HowItWorksPage from '../pages/HowItWorksPage';
-import LiveVisitBeacon from '../components/LiveVisitBeacon';
 import Header from '../components/Header';
 import ThemeSwitcher from '../components/ThemeSwitcher';
 import BitcoinBackgroundMark from '../components/BitcoinBackgroundMark';
@@ -308,15 +307,9 @@ function App() {
     setCurrentIndex(highest ? highest.index : null);
   }, [refs]);
 
-
-  const publishLiveCount = useCallback((count) => {
-    window.dispatchEvent(new CustomEvent('theblocknote:live-visits', { detail: count }))
-  }, [])
-
   return (
     <>
       <SharedContext.Provider value={{ refs, setRefs, addressFunds, fundsProgress, currentIndex, setCurrentIndex, refreshRefs: fetchAddresses, ensureUtxoHex }}>
-        <LiveVisitBeacon onCount={publishLiveCount} />
         <div className="h-screen flex flex-col bg-[image:var(--theme-bg)] text-white relative overflow-hidden">
               <BitcoinBackgroundMark opacity={0.2} />
               <div className="relative z-10 flex min-h-0 flex-1 flex-col">

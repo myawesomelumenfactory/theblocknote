@@ -147,6 +147,24 @@ html, body, #root {
   opacity: 1 !important;
 }
 
+html[data-theme="bitcoin-orange"] .compose-send-btn {
+  background-color: rgba(247, 147, 26, 0.75) !important;
+  border-color: rgba(255, 255, 255, 0.55) !important;
+  box-shadow: var(--theme-nav-active-shadow) !important;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+html[data-theme="bitcoin-orange"] .compose-send-btn,
+html[data-theme="bitcoin-orange"] .compose-send-btn span,
+html[data-theme="bitcoin-orange"] .compose-send-btn svg {
+  color: #ffffff !important;
+}
+
+html[data-theme="bitcoin-orange"] .compose-send-btn:not(:disabled):hover {
+  background-color: rgba(247, 147, 26, 0.88) !important;
+}
+
 html[data-theme="deep-ledger"] .compose-send-btn {
   background-color: rgba(255, 255, 255, 0.2) !important;
   border-color: rgba(255, 255, 255, 0.2) !important;
