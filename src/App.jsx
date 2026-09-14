@@ -6,6 +6,7 @@ import MainPage from '../pages/MainPage';
 import ReadPage from '../pages/ReadPage';
 import GeneratePage from '../pages/GeneratePage';
 import StatusPage from '../pages/StatusPage';
+import DirectMessagePage from '../pages/DirectMessagePage';
 import HowItWorksPage from '../pages/HowItWorksPage';
 import LiveVisitBeacon from '../components/LiveVisitBeacon';
 import Header from '../components/Header';
@@ -327,6 +328,7 @@ function App() {
                     <Route path="/read" element={<ReadPage />} />
                     <Route path="/generate" element={<GeneratePage />} />
                     <Route path="/status" element={<StatusPage />} />
+                    <Route path="/direct" element={<DirectMessagePage />} />
                     <Route path="/how-it-works" element={<HowItWorksPage />} />
                   </Routes>
                 </div>

@@ -7,6 +7,7 @@ import { encodeComment, cleanCommentText, COMMENT_TEXT_MAX } from './immutablePr
 import { estimateConsolidationFee, isValidAddress } from './BitcoinUtils';
 
 const ECPair = ECPairFactory(ecc);
+const P2PKH_DUST = 546;
 
 /**
  * Broadcast a raw transaction to the Bitcoin network
@@ -82,13 +83,15 @@ export async function broadcastTransaction(rawTxHex) {
 }
 
 /**
- * Create and sign a Bitcoin transaction with OP_RETURN data
+ * Create and sign a Bitcoin transaction with OP_RETURN data.
+ * Optional recipientAddress adds a payment output so the tx goes to that address.
  * @param {Object} utxo - UTXO information
  * @param {string} message - Message to embed
  * @param {number} fee - Transaction fee in satoshis
+ * @param {{ recipientAddress?: string, amount?: number }} [options]
  * @returns {Promise<string>} Raw transaction hex
  */
-export async function createTransaction(utxo, message, fee) {
+export async function createTransaction(utxo, message, fee, options = {}) {
   const network = bitcoin.networks.bitcoin; // mainnet
   const keyPair = ECPair.fromWIF(utxo.private_key, network);
   
@@ -105,11 +108,30 @@ export async function createTransaction(utxo, message, fee) {
   console.log('--- Current UTXO ---');
   console.log(utxoData);
 
-  // Calculate change
-  const change = utxoData.value - fee;
+  const recipientAddress = options.recipientAddress || null;
+  let recipientValue = 0;
+
+  if (recipientAddress) {
+    if (!isValidAddress(recipientAddress, network)) {
+      throw new Error('Invalid recipient address');
+    }
+    recipientValue = Number(options.amount);
+    if (!Number.isFinite(recipientValue) || recipientValue <= 0) {
+      recipientValue = P2PKH_DUST;
+    }
+    if (recipientValue < P2PKH_DUST) {
+      throw new Error(`Recipient amount must be at least ${P2PKH_DUST} sats`);
+    }
+  }
+
+  // Calculate change (omit change output when exactly zero)
+  const change = utxoData.value - fee - recipientValue;
   
   if (change < 0) {
     throw new Error('Insufficient funds for transaction');
+  }
+  if (change > 0 && change < P2PKH_DUST) {
+    throw new Error('Insufficient funds: change would be below dust limit');
   }
   
   // Create OP_RETURN output
@@ -118,17 +140,23 @@ export async function createTransaction(utxo, message, fee) {
   const embed = bitcoin.payments.embed({ data: [data] });
   
   try {
-    return await createTransactionWithPSBT(utxoData, utxo, embed, change, keyPair, network);
+    return await createTransactionWithPSBT(
+      utxoData, utxo, embed, change, keyPair, network, recipientAddress, recipientValue
+    );
   } catch (psbtError) {
     console.warn('PSBT method failed, trying manual transaction creation:', psbtError.message);
-    return await createTransactionManually(utxoData, utxo, embed, change, keyPair, network);
+    return await createTransactionManually(
+      utxoData, utxo, embed, change, keyPair, network, recipientAddress, recipientValue
+    );
   }
 }
 
 /**
  * Create transaction using PSBT (Partially Signed Bitcoin Transaction)
  */
-async function createTransactionWithPSBT(utxoData, utxo, embed, change, keyPair, network) {
+async function createTransactionWithPSBT(
+  utxoData, utxo, embed, change, keyPair, network, recipientAddress = null, recipientValue = 0
+) {
   console.log('Creating PSBT...');
   const psbt = new bitcoin.Psbt({ network });
   
@@ -142,11 +170,20 @@ async function createTransactionWithPSBT(utxoData, utxo, embed, change, keyPair,
     script: embed.output,
     value: 0,
   });
-  
-  psbt.addOutput({
-    address: utxo.public_key,
-    value: change,
-  });
+
+  if (recipientAddress && recipientValue > 0) {
+    psbt.addOutput({
+      address: recipientAddress,
+      value: recipientValue,
+    });
+  }
+
+  if (change > 0) {
+    psbt.addOutput({
+      address: utxo.public_key,
+      value: change,
+    });
+  }
   
   // Create proper signing keypair
   const signingKeyPair = createSigningKeyPair(keyPair);
@@ -160,7 +197,9 @@ async function createTransactionWithPSBT(utxoData, utxo, embed, change, keyPair,
 /**
  * Create transaction manually (fallback method)
  */
-async function createTransactionManually(utxoData, utxo, embed, change, keyPair, network) {
+async function createTransactionManually(
+  utxoData, utxo, embed, change, keyPair, network, recipientAddress = null, recipientValue = 0
+) {
   console.log('Creating transaction manually...');
   
   const tx = new bitcoin.Transaction();
@@ -170,10 +209,15 @@ async function createTransactionManually(utxoData, utxo, embed, change, keyPair,
   
   // Add OP_RETURN output
   tx.addOutput(embed.output, 0);
-  
-  // Add change output
-  const changeScript = bitcoin.address.toOutputScript(utxo.public_key, network);
-  tx.addOutput(changeScript, change);
+
+  if (recipientAddress && recipientValue > 0) {
+    tx.addOutput(bitcoin.address.toOutputScript(recipientAddress, network), recipientValue);
+  }
+
+  if (change > 0) {
+    const changeScript = bitcoin.address.toOutputScript(utxo.public_key, network);
+    tx.addOutput(changeScript, change);
+  }
   
   // Create and apply signature
   const hashType = bitcoin.Transaction.SIGHASH_ALL;
@@ -231,8 +275,6 @@ export function getHighestFundedUnit(units, fee = 450) {
   }
   return best;
 }
-
-const P2PKH_DUST = 546;
 
 export function getFundedUnits(units) {
   if (!Array.isArray(units)) return [];
@@ -405,6 +447,52 @@ export async function sendBitcoinTransaction(utxo, message, fee = 450) {
       success: false,
       error: error.message,
       rawTxHex: error.rawTxHex || null
+    };
+  }
+}
+
+/**
+ * Direct message: OP_RETURN text plus a payment output to recipientAddress.
+ * @param {Object} utxo
+ * @param {string} message
+ * @param {string} recipientAddress
+ * @param {number} [fee=450]
+ * @param {number} [amount=546] - sats paid to recipient (dust minimum)
+ */
+export async function sendDirectMessageTransaction(
+  utxo,
+  message,
+  recipientAddress,
+  fee = 450,
+  amount = P2PKH_DUST
+) {
+  try {
+    if (!recipientAddress || !isValidAddress(recipientAddress)) {
+      throw new Error('Invalid recipient address');
+    }
+
+    const encoded = encode('t', 0, 0, message);
+    const rawTxHex = await createTransaction(utxo, encoded, fee, {
+      recipientAddress,
+      amount,
+    });
+
+    const transactionId = await broadcastTransaction(rawTxHex);
+
+    return {
+      success: true,
+      transactionId: transactionId.replace(/[^a-f0-9]/gi, ''),
+      rawTxHex,
+      amount,
+      recipientAddress,
+      explorerUrl: `https://mempool.space/tx/${transactionId.replace(/[^a-f0-9]/gi, '')}`,
+    };
+  } catch (error) {
+    console.error('Direct message failed:', error.message);
+    return {
+      success: false,
+      error: error.message,
+      rawTxHex: error.rawTxHex || null,
     };
   }
 }
