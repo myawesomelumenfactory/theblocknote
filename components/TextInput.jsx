@@ -4,11 +4,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Type, AlertCircle } from "lucide-react";
 import { useLanguage } from "../src/i18n/LanguageContext";
 import { useTheme } from "../src/theme/ThemeContext";
+import { MESSAGE_TEXT_MAX } from "../services/immutableProtocol";
 
 export default function TextInput({ 
   value, 
   onChange, 
-  maxLength = 80,
+  maxLength = MESSAGE_TEXT_MAX,
   fee = 0,
   placeholderOptions,
   className = ""

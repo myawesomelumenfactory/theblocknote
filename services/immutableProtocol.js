@@ -2,11 +2,50 @@ import { decodeOpReturn } from './TheBlockNote.js'
 
 export const PROTOCOL_RE = /^t\s+-?\d+\s+-?\d+/
 
+/**
+ * Max OP_RETURN data length using a single OP_PUSHBYTES_n (1..75).
+ * Longer payloads use OP_PUSHDATA1 and break the legacy simple decoder.
+ */
+export const OP_RETURN_SIMPLE_PUSH_MAX = 75
+
+/** Prefix/suffix of `t 0 0 "<text>"`. */
+const MESSAGE_WRAP_OVERHEAD = 't 0 0 ""'.length // 8
+
+/**
+ * Max Speak / direct-message body so the full protocol line fits a simple push.
+ * (Previously 80 chars → ~88-byte OP_RETURN → OP_PUSHDATA1 → indexer miss.)
+ */
+export const MESSAGE_TEXT_MAX = OP_RETURN_SIMPLE_PUSH_MAX - MESSAGE_WRAP_OVERHEAD // 67
+
 /** First hex chars of parent txid used in comment OP_RETURNs. */
 export const COMMENT_TXID_PREFIX_LEN = 12
 
 /** Max comment body length so `t 0 2 <txid12> <vout> "<text>"` stays ≤ 80 bytes. */
 export const COMMENT_TEXT_MAX = 50
+
+function utf8ByteLength(text) {
+  if (typeof Buffer !== 'undefined') return Buffer.byteLength(text, 'utf8')
+  return new TextEncoder().encode(text).length
+}
+
+/**
+ * Encode a public message: t 0 0 "<text>"
+ * Enforced to stay within OP_RETURN_SIMPLE_PUSH_MAX bytes.
+ */
+export function encodeMessage(text) {
+  const body = String(text ?? '')
+  if (!body.trim()) {
+    throw new Error('Message is empty')
+  }
+  if (body.length > MESSAGE_TEXT_MAX) {
+    throw new Error(`Message must be ${MESSAGE_TEXT_MAX} characters or fewer`)
+  }
+  const encoded = `t 0 0 "${body}"`
+  if (utf8ByteLength(encoded) > OP_RETURN_SIMPLE_PUSH_MAX) {
+    throw new Error('Message exceeds the OP_RETURN simple-push limit')
+  }
+  return encoded
+}
 
 export function isProtocolMessage(text) {
   return typeof text === 'string' && PROTOCOL_RE.test(text.trim())

@@ -133,6 +133,7 @@ export async function appendImmutable(entry) {
 const PROGRESS_EVENT = 'theblocknote:immutables-progress'
 
 let catchUpInFlight = null
+let catchUpGeneration = 0
 let lastProgress = {
   scanning: false,
   startHeight: null,
@@ -206,8 +207,10 @@ export function subscribeImmutablesProgress(onProgress) {
   }
 }
 
-function startCatchUp(lastHeight) {
-  if (catchUpInFlight) return catchUpInFlight
+function startCatchUp(lastHeight, { force = false } = {}) {
+  if (catchUpInFlight && !force) return catchUpInFlight
+
+  const generation = ++catchUpGeneration
 
   lastProgress = {
     scanning: true,
@@ -221,6 +224,7 @@ function startCatchUp(lastHeight) {
   catchUpInFlight = (async () => {
     const { extra, tip, lastHeight: scannedTo } = await catchUpImmutables(lastHeight, {
       onBlock: ({ height, tip: chainTip, added }) => {
+        if (generation !== catchUpGeneration) return
         const records = mergeImmutables(readStoredRecords(), added)
         persistSnapshot(records, {
           ...parseState(readStoredState(), records),
@@ -239,6 +243,10 @@ function startCatchUp(lastHeight) {
         })
       },
     })
+
+    if (generation !== catchUpGeneration) {
+      return readStoredRecords()
+    }
 
     const records = mergeImmutables(readStoredRecords(), extra)
     persistSnapshot(records, {
@@ -261,6 +269,7 @@ function startCatchUp(lastHeight) {
     return records
   })()
     .catch((error) => {
+      if (generation !== catchUpGeneration) return readStoredRecords()
       emitProgress({
         scanning: false,
         error: error?.message || 'Catch-up failed',
@@ -268,6 +277,7 @@ function startCatchUp(lastHeight) {
       return readStoredRecords()
     })
     .finally(() => {
+      if (generation !== catchUpGeneration) return
       catchUpInFlight = null
       lastProgress.scanning = false
       emitProgress({ scanning: false })
@@ -280,6 +290,18 @@ export async function loadImmutableRecords(bundledRecords, bundledState) {
   const snapshot = hydrateFromBundled(bundledRecords, bundledState)
   startCatchUp(snapshot.state.lastHeight)
   return mergeImmutables(snapshot.records, readImmutablesOverlay())
+}
+
+/**
+ * Force-restart live catch-up from the current immutables snapshot height
+ * (localStorage / baked data), even if a previous scan is still running.
+ * Kicks off scanning and returns immediately; progress updates via subscribers.
+ */
+export function restartImmutablesCatchUp(bundledRecords, bundledState) {
+  const snapshot = hydrateFromBundled(bundledRecords, bundledState)
+  const fromHeight = snapshot.state.lastHeight
+  startCatchUp(fromHeight, { force: true })
+  return fromHeight
 }
 
 export function useImmutablesProgress() {

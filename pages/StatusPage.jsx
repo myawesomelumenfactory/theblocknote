@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Activity } from 'lucide-react'
+import { Activity, RefreshCw } from 'lucide-react'
 import GlassCard from '../components/GlassCard'
 import {
   getImmutablesProgress,
   loadImmutableRecords,
+  restartImmutablesCatchUp,
   subscribeImmutablesProgress,
 } from '../services/ImmutablesStore'
 import { applyChainTip, refreshChainTip, useChainTip } from '../services/ChainTipStore'
@@ -26,6 +27,7 @@ export default function StatusPage() {
   const chainTip = useChainTip()
   const { t, locale } = useLanguage()
   const [progress, setProgress] = useState(() => getImmutablesProgress())
+  const [restarting, setRestarting] = useState(false)
 
   useEffect(() => {
     const stop = subscribeImmutablesProgress(setProgress)
@@ -63,6 +65,23 @@ export default function StatusPage() {
     loadImmutableRecords(immutablesData, immutablesState)
   }, [chainTip, progress.lastHeight])
 
+  const handleRestart = async () => {
+    setRestarting(true)
+    try {
+      await Promise.all([
+        refreshChainTip(),
+        mempoolTipHeight().then(applyChainTip).catch(() => 0),
+      ])
+      restartImmutablesCatchUp(immutablesData, immutablesState)
+      setProgress(getImmutablesProgress())
+    } catch (error) {
+      console.error('Failed to restart immutables catch-up:', error)
+    } finally {
+      setRestarting(false)
+      setProgress(getImmutablesProgress())
+    }
+  }
+
   const lastHeight = progress.lastHeight
   const remaining =
     Number.isFinite(chainTip) && Number.isFinite(lastHeight)
@@ -95,6 +114,8 @@ export default function StatusPage() {
     ? `https://mempool.space/block/${chainTip}`
     : 'https://mempool.space'
 
+  const canRestart = Number.isFinite(lastHeight) && !restarting
+
   return (
     <div className="w-full px-4 sm:px-6 lg:px-8 pt-4 pb-16">
         <GlassCard className="max-w-3xl mx-auto p-6 md:p-8">
@@ -114,12 +135,27 @@ export default function StatusPage() {
               style={{ width: `${Math.max(percent, progress.scanning ? 4 : 0)}%` }}
             />
           </div>
-          <p className="text-sm text-white/50 tabular-nums mb-8">
+          <p className="text-sm text-white/50 tabular-nums mb-6">
             {t('status.percent', { percent: percent.toFixed(1) })}
             {Number.isFinite(remaining)
               ? ` · ${t(remaining === 1 ? 'status.remaining' : 'status.remainingPlural', { count: formatHeight(remaining, locale) })}`
               : ''}
           </p>
+
+          <button
+            type="button"
+            onClick={handleRestart}
+            disabled={!canRestart}
+            title={t('status.restartHint', { height: formatHeight(lastHeight, locale) })}
+            className={`mb-8 inline-flex items-center justify-center gap-2 w-full sm:w-auto px-4 py-2.5 rounded-xl border text-sm font-medium transition-colors ${
+              !canRestart
+                ? 'cursor-not-allowed bg-white/5 text-white/40 border-white/10'
+                : 'cursor-pointer bg-[color:var(--theme-accent-strong)]/80 text-white border-white/20 hover:opacity-95'
+            }`}
+          >
+            <RefreshCw className={`w-4 h-4 ${restarting || progress.scanning ? 'animate-spin' : ''}`} />
+            {restarting ? t('status.restarting') : t('status.restart')}
+          </button>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Stat label={t('status.indexedHeight')} value={formatHeight(lastHeight, locale)} />

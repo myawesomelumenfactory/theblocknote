@@ -6,7 +6,7 @@ import EmbedButton from '../components/EmbedButton';
 import { SharedContext } from '../src/SharedContext';
 import { getHighestFundedUnit, sendBitcoinTransaction, validateUTXO } from '../services/BitcoinService';
 import { appendImmutable } from '../services/ImmutablesStore';
-import { encode } from '../services/TheBlockNote';
+import { encodeMessage, MESSAGE_TEXT_MAX } from '../services/immutableProtocol';
 import { getRecommendedFeeTiers } from '../services/BitcoinUtils';
 import { useLanguage } from '../src/i18n/LanguageContext';
 
@@ -101,7 +101,7 @@ export default function Compose() {
         await appendImmutable({
           index: `${result.transactionId}_0`,
           time: Math.floor(Date.now() / 1000),
-          value: encode('t', 0, 0, outgoingMessage),
+          value: encodeMessage(outgoingMessage),
           unconfirmed: true,
         });
 
@@ -142,7 +142,7 @@ export default function Compose() {
         <TextInput 
           value={message}
           onChange={setMessage}
-          maxLength={80}
+          maxLength={MESSAGE_TEXT_MAX}
           fee={fee}
         />
       </div>

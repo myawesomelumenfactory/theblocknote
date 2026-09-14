@@ -310,6 +310,9 @@ export const translations = {
       lastUpdated: 'Last updated',
       error: 'Error',
       latestBlock: 'Latest Bitcoin block on mempool.space',
+      restart: 'Restart catch-up',
+      restarting: 'Restarting catch-up…',
+      restartHint: 'Resume scanning from immutables height {height} to the current tip',
     },
     generate: {
       button: 'Generate',
@@ -581,6 +584,9 @@ export const translations = {
       lastUpdated: 'Dernière mise à jour',
       error: 'Erreur',
       latestBlock: 'Dernier bloc Bitcoin sur mempool.space',
+      restart: 'Relancer le rattrapage',
+      restarting: 'Relance du rattrapage…',
+      restartHint: 'Reprendre le scan depuis la hauteur immutables {height} jusqu’au sommet actuel',
     },
     generate: {
       button: 'Générer',

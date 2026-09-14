@@ -107,7 +107,7 @@ export async function estimateConsolidationFee(inputCount, fallbackFee = 450) {
  * @param {number} [opReturnSize=80] - Size of OP_RETURN data in bytes
  * @returns {number} Estimated transaction size in bytes
  */
-export function estimateTransactionSize(inputCount, outputCount, opReturnSize = 80) {
+export function estimateTransactionSize(inputCount, outputCount, opReturnSize = 75) {
   // Base transaction overhead
   const baseSize = 10;
   

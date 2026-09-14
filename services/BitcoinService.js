@@ -2,8 +2,7 @@
 import * as ecc from 'tiny-secp256k1';
 import ECPairFactory from 'ecpair';
 import * as bitcoin from 'bitcoinjs-lib';
-import { encode } from '../services/TheBlockNote';
-import { encodeComment, cleanCommentText, COMMENT_TEXT_MAX } from './immutableProtocol.js';
+import { encodeComment, cleanCommentText, COMMENT_TEXT_MAX, encodeMessage } from './immutableProtocol.js';
 import { estimateConsolidationFee, isValidAddress } from './BitcoinUtils';
 
 const ECPair = ECPairFactory(ecc);
@@ -427,8 +426,8 @@ export async function sendBitcoinTransaction(utxo, message, fee = 450) {
   try {
     console.log('Creating transaction...');
 
-    // Encode message using The Block Note Protocol
-    const encoded = encode("t", 0, 0, message);
+    // Encode message using The Block Note Protocol (≤75-byte simple OP_RETURN push)
+    const encoded = encodeMessage(message);
 
     const rawTxHex = await createTransaction(utxo, encoded, fee);
     
@@ -471,7 +470,7 @@ export async function sendDirectMessageTransaction(
       throw new Error('Invalid recipient address');
     }
 
-    const encoded = encode('t', 0, 0, message);
+    const encoded = encodeMessage(message);
     const rawTxHex = await createTransaction(utxo, encoded, fee, {
       recipientAddress,
       amount,

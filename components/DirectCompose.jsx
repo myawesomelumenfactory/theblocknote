@@ -9,6 +9,7 @@ import {
   validateUTXO,
 } from '../services/BitcoinService';
 import { isValidAddress } from '../services/BitcoinUtils';
+import { MESSAGE_TEXT_MAX } from '../services/immutableProtocol';
 import { useLanguage } from '../src/i18n/LanguageContext';
 
 const FEE = 450;
@@ -120,7 +121,7 @@ export default function DirectCompose() {
         <TextInput
           value={message}
           onChange={setMessage}
-          maxLength={80}
+          maxLength={MESSAGE_TEXT_MAX}
           fee={FEE}
           placeholderOptions={t('direct.placeholders')}
         />
