@@ -18,6 +18,19 @@ export function mergeImmutables(base, extra) {
   const byIndex = new Map()
   for (const row of [...(base || []), ...(extra || [])]) {
     if (!row?.index) continue
+    const prev = byIndex.get(row.index)
+    if (!prev) {
+      byIndex.set(row.index, row)
+      continue
+    }
+    // Keep a confirmed chain record over an optimistic unconfirmed send.
+    if (prev.unconfirmed && !row.unconfirmed) {
+      byIndex.set(row.index, row)
+      continue
+    }
+    if (!prev.unconfirmed && row.unconfirmed) {
+      continue
+    }
     byIndex.set(row.index, row)
   }
   return [...byIndex.values()]
@@ -113,6 +126,7 @@ export async function appendImmutable(entry) {
     // Static hosts cannot write the JSON files; localStorage still updates the UI.
   }
 
+  emitImmutablesUpdated()
   return overlay
 }
 

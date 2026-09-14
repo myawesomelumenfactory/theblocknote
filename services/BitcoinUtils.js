@@ -8,17 +8,54 @@ import * as bitcoin from 'bitcoinjs-lib';
  */
 export async function getRecommendedFee(fallbackFee = 450) {
   try {
-    const response = await fetch('https://mempool.space/api/v1/fees/recommended');
-    const fees = await response.json();
-    
-    // Use "fastest" fee rate and multiply by approximate transaction size (250 bytes)
-    const feeRate = fees.fastestFee || 10; // satoshis per vByte
-    const estimatedSize = 250; // bytes for a typical transaction with OP_RETURN
-    
-    return Math.max(feeRate * estimatedSize, fallbackFee);
+    const tiers = await getRecommendedFeeTiers();
+    return Math.max(tiers.fast.fee, fallbackFee);
   } catch (error) {
     console.warn('Could not fetch recommended fee, using fallback:', fallbackFee);
     return fallbackFee;
+  }
+}
+
+/** Typical Speak / vote / comment size: 1 P2PKH in, OP_RETURN + change (~281 vB). */
+export const SPEAK_TX_VBYTES = 281;
+
+/**
+ * Live fee tiers from mempool.space for a Speak-sized transaction.
+ * Fast uses mempool's next-block target (`fastestFee`) — there is no protocol max fee,
+ * only what your funded unit can afford while leaving change above dust.
+ * @param {{ fallbackRate?: number, vbytes?: number, minFee?: number }} [options]
+ */
+export async function getRecommendedFeeTiers({
+  fallbackRate = 10,
+  vbytes = SPEAK_TX_VBYTES,
+  minFee = 100,
+} = {}) {
+  const toTier = (id, rate) => {
+    const safeRate = Math.max(Number(rate) || fallbackRate, 1);
+    return {
+      id,
+      rate: safeRate,
+      fee: Math.max(Math.ceil(safeRate * vbytes), minFee),
+    };
+  };
+
+  try {
+    const response = await fetch('https://mempool.space/api/v1/fees/recommended');
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const fees = await response.json();
+
+    return {
+      economy: toTier('economy', fees.hourFee ?? fees.economyFee ?? fallbackRate),
+      standard: toTier('standard', fees.halfHourFee ?? fallbackRate),
+      fast: toTier('fast', fees.fastestFee ?? fallbackRate),
+    };
+  } catch (error) {
+    console.warn('Could not fetch fee tiers, using fallbacks:', error.message);
+    return {
+      economy: toTier('economy', Math.max(1, Math.floor(fallbackRate / 2))),
+      standard: toTier('standard', fallbackRate),
+      fast: toTier('fast', fallbackRate * 2),
+    };
   }
 }
 

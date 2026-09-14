@@ -112,7 +112,9 @@ html[data-theme="bitcoin-orange"] .hover\:text-white\/60:hover {
 
 /* Active chrome stays orange with white labels on the light theme. */
 html[data-theme="bitcoin-orange"] a[aria-current="page"],
-html[data-theme="bitcoin-orange"] .chrome-toggle > button[aria-pressed="true"] {
+html[data-theme="bitcoin-orange"] .chrome-toggle > button[aria-pressed="true"],
+html[data-theme="bitcoin-orange"] .compose-fee-btn[aria-pressed="true"],
+html[data-theme="bitcoin-orange"] .compose-fee-btn[aria-pressed="true"] span {
   color: #ffffff !important;
 }
 

@@ -183,12 +183,14 @@ export default function LatestMessagesBlocks() {
         time: Math.floor(Date.now() / 1000),
         value: result.encoded,
         kind: 'comment',
+        unconfirmed: true,
       });
 
       const newComment = {
         txid: result.transactionId,
         time: Math.floor(Date.now() / 1000),
         text: cleaned,
+        unconfirmed: true,
       };
 
       setTheBlockNote((prev) =>
@@ -403,6 +405,7 @@ export default function LatestMessagesBlocks() {
             "time": m.time,
             "index": m.index,
             "value": message,
+            "unconfirmed": Boolean(m.unconfirmed),
             "downs": 0,
             "ups": 0,
             "votes": [],
@@ -441,7 +444,8 @@ export default function LatestMessagesBlocks() {
             "prefixRaw": parsed.prefixRaw,
             "vout": parsed.vout,
             "text": parsed.text,
-            "txid": voteTxidFromIndex(m.index)
+            "txid": voteTxidFromIndex(m.index),
+            "unconfirmed": Boolean(m.unconfirmed),
           });
         }
       }
@@ -483,6 +487,7 @@ export default function LatestMessagesBlocks() {
             txid: comment.txid,
             time: comment.time,
             text: comment.text,
+            unconfirmed: Boolean(comment.unconfirmed),
           });
         }
       });
@@ -699,7 +704,17 @@ export default function LatestMessagesBlocks() {
             <div className="space-y-4">
               {/* Message Content */}
               <div>
-                <p className="text-white text-lg mb-2">{msg.value}</p>
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <p className="text-white text-lg min-w-0">{msg.value}</p>
+                  {msg.unconfirmed ? (
+                    <span
+                      title={t('messages.unconfirmedHint')}
+                      className="shrink-0 inline-flex items-center rounded-full border border-red-400/45 bg-red-500/15 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-red-300"
+                    >
+                      {t('messages.unconfirmed')}
+                    </span>
+                  ) : null}
+                </div>
                 {txUrl ? (
                     <a
                       href={txUrl}
@@ -709,9 +724,13 @@ export default function LatestMessagesBlocks() {
                       className="text-white/30 text-sm hover:text-white/60"
                     >
                       {formatTimestampToUTC(msg.time)}
+                      {msg.unconfirmed ? ` · ${t('messages.unconfirmedDetail')}` : ''}
                     </a>
                 ) : (
-                  <p className="text-white/30 text-sm">{formatTimestampToUTC(msg.time)}</p>
+                  <p className="text-white/30 text-sm">
+                    {formatTimestampToUTC(msg.time)}
+                    {msg.unconfirmed ? ` · ${t('messages.unconfirmedDetail')}` : ''}
+                  </p>
                 )}
               </div>
               
@@ -831,15 +850,32 @@ export default function LatestMessagesBlocks() {
                             className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2"
                           >
                             <div className="flex items-start justify-between gap-3">
-                              <a
-                                href={explorerTxUrl(comment.txid)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                title={t('messages.viewTx')}
-                                className="text-white text-sm hover:text-white/80 underline decoration-white/25 hover:decoration-white/60"
-                              >
-                                {comment.text}
-                              </a>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-start gap-2 flex-wrap">
+                                  <a
+                                    href={explorerTxUrl(comment.txid)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    title={t('messages.viewTx')}
+                                    className="text-white text-sm hover:text-white/80 underline decoration-white/25 hover:decoration-white/60"
+                                  >
+                                    {comment.text}
+                                  </a>
+                                  {comment.unconfirmed ? (
+                                    <span
+                                      title={t('messages.unconfirmedHint')}
+                                      className="shrink-0 inline-flex items-center rounded-full border border-red-400/45 bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-300"
+                                    >
+                                      {t('messages.unconfirmed')}
+                                    </span>
+                                  ) : null}
+                                </div>
+                                {comment.unconfirmed ? (
+                                  <p className="text-white/35 text-xs mt-1">
+                                    {t('messages.unconfirmedDetail')}
+                                  </p>
+                                ) : null}
+                              </div>
                               <span className="text-white/40 text-xs shrink-0 pt-0.5">{formatTimestampToUTC(comment.time)}</span>
                             </div>
                           </li>
