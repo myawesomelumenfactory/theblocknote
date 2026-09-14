@@ -1,5 +1,6 @@
 import React from "react";
 import bitcoinLogo from "../src/assets/bitcoin.svg";
+import { useTheme } from "../src/theme/ThemeContext";
 
 const STROKE = 3
 const VIEW = 106
@@ -18,8 +19,12 @@ export default function BitcoinLogo({
   percent = null,
   title,
 }) {
+  const { theme } = useTheme();
   const progress = ringProgress(percent);
   const dash = progress == null ? 0 : (RING_C * progress) / 100;
+  const isBitcoinOrange = theme === 'bitcoin-orange';
+  const trackStroke = isBitcoinOrange ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.35)';
+  const progressStroke = isBitcoinOrange ? 'rgba(0,0,0,0.1)' : '#ffffff';
 
   return (
     <span className={`relative inline-flex shrink-0 overflow-visible ${className}`}>
@@ -41,7 +46,7 @@ export default function BitcoinLogo({
             cy={CENTER}
             r={RING_R}
             fill="none"
-            stroke="rgba(255,255,255,0.35)"
+            stroke={trackStroke}
             strokeWidth={STROKE}
             vectorEffect="nonScalingStroke"
           />
@@ -50,7 +55,7 @@ export default function BitcoinLogo({
             cy={CENTER}
             r={RING_R}
             fill="none"
-            stroke="#ffffff"
+            stroke={progressStroke}
             strokeWidth={STROKE}
             strokeLinecap="butt"
             strokeDasharray={progress >= 100 ? undefined : `${dash} ${RING_C}`}
