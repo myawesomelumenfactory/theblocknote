@@ -112,14 +112,26 @@ export default function DirectInbox({ initialAddress = '' }) {
       <div className="space-y-3">
         {messages.map((item) => {
           const when = formatTimestampToUTC(item.time)
+          const isProtocol = item.source === 'theblocknote'
           return (
             <article
               key={item.index}
               className="rounded-2xl bg-white/5 border border-white/10 p-4"
             >
-              <p className="text-white text-base leading-relaxed break-words">
-                {item.text || item.value}
-              </p>
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <p className="text-white text-base leading-relaxed break-words min-w-0">
+                  {item.text || item.value}
+                </p>
+                <span
+                  className={`shrink-0 inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold tracking-wide ${
+                    isProtocol
+                      ? 'border-[color:var(--theme-accent-strong)]/40 bg-[color:var(--theme-accent-strong)]/15 text-[color:var(--theme-accent-soft)]'
+                      : 'border-white/20 bg-white/10 text-white/70'
+                  }`}
+                >
+                  {isProtocol ? t('direct.tagTheBlockNote') : t('direct.tagOpReturn')}
+                </span>
+              </div>
               <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/40">
                 {when ? <span className="tabular-nums">{when}</span> : null}
                 {Number.isFinite(item.amountPaid) ? (

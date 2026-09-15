@@ -1,6 +1,7 @@
 import { explorerJson } from './BlockstreamExplorer.js'
 import { isValidAddress } from './BitcoinUtils.js'
 import {
+  isProtocolMessage,
   parseProtocolValue,
   recordsFromEsploraTxs,
 } from './immutableProtocol.js'
@@ -46,9 +47,16 @@ export async function fetchAddressTransactions(address, { maxPages = MAX_PAGES }
   return all
 }
 
+function displayTextForRecord(value, parsed) {
+  if (parsed?.kind === 'message' || parsed?.kind === 'comment') {
+    return parsed.text || value
+  }
+  return value
+}
+
 /**
- * Immutable protocol messages paid to a specific address (direct-message shape:
- * payment output to address + OP_RETURN in the same tx).
+ * OP_RETURN payloads paid to a specific address (payment output + OP_RETURN in the same tx).
+ * Tags The Block Note protocol lines vs plain OP_RETURN data.
  */
 export async function fetchAddressDirectMessages(address) {
   const trimmed = String(address || '').trim()
@@ -59,15 +67,16 @@ export async function fetchAddressDirectMessages(address) {
   const txs = await fetchAddressTransactions(trimmed)
   const incoming = txs.filter((tx) => txPaysAddress(tx, trimmed))
   const byTxid = new Map(incoming.map((tx) => [tx.txid, tx]))
-  const records = recordsFromEsploraTxs(incoming, Math.floor(Date.now() / 1000), true)
+  const records = recordsFromEsploraTxs(incoming, Math.floor(Date.now() / 1000), false)
 
   return records
     .map((record) => {
-      const parsed = parseProtocolValue(record.value)
-      if (parsed?.kind !== 'message') return null
+      if (!record?.value) return null
 
       const txid = String(record.index || '').split('_')[0]
       const vout = Number.parseInt(String(record.index || '').split('_')[1], 10)
+      const parsed = parseProtocolValue(record.value)
+      const source = isProtocolMessage(record.value) ? 'theblocknote' : 'op_return'
 
       return {
         index: record.index,
@@ -75,7 +84,9 @@ export async function fetchAddressDirectMessages(address) {
         vout,
         time: record.time,
         value: record.value,
-        text: parsed.text,
+        text: displayTextForRecord(record.value, parsed),
+        source,
+        kind: parsed?.kind || 'op_return',
         amountPaid: paidAmountInTx(byTxid.get(txid), trimmed),
       }
     })
