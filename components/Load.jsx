@@ -14,6 +14,7 @@ import {
     ChevronRight,
     Trash2,
     Combine,
+    Undo2,
     Loader2,
     Plus,
 } from "lucide-react";
@@ -31,7 +32,7 @@ import {
     writeStoredKeyPairs,
     clearStoredKeyPairs,
 } from '../services/ParticipationKeys';
-import { consolidateFundedUnits, getFundedUnits } from '../services/BitcoinService';
+import { consolidateFundedUnits, getFundedUnits, refundFundedUnits, resolveFundingOriginAddress } from '../services/BitcoinService';
 import { estimateConsolidationFee } from '../services/BitcoinUtils';
 import { windowMotion } from '../services/introMotion';
 import { useLanguage } from '../src/i18n/LanguageContext';
@@ -77,6 +78,11 @@ export default function Load() {
     const [consolidateFee, setConsolidateFee] = useState(null);
     const [consolidateError, setConsolidateError] = useState(null);
     const [consolidateTxId, setConsolidateTxId] = useState('');
+    const [confirmingRefund, setConfirmingRefund] = useState(false);
+    const [refunding, setRefunding] = useState(false);
+    const [refundPlan, setRefundPlan] = useState([]);
+    const [refundError, setRefundError] = useState(null);
+    const [refundTxIds, setRefundTxIds] = useState([]);
     const { refs, setCurrentIndex, addressFunds, fundsProgress, refreshRefs, ensureUtxoHex } = useContext(SharedContext);
     const { t, locale } = useLanguage();
 
@@ -270,6 +276,93 @@ export default function Load() {
         }
     };
 
+    const handleStartRefund = async () => {
+        setRefundError(null);
+        setRefundTxIds([]);
+        setConfirmingConsolidate(false);
+        const units = getFundedUnits(participationUnits);
+        if (units.length < 1) {
+            setRefundError(t('spark.refundNeedUnits'));
+            return;
+        }
+        try {
+            const prepared = [];
+            for (const unit of units) {
+                const full = unit.index != null && ensureUtxoHex
+                    ? await ensureUtxoHex(unit.index)
+                    : unit;
+                prepared.push(full || unit);
+            }
+
+            const groups = new Map();
+            for (const unit of prepared) {
+                const origin = await resolveFundingOriginAddress(unit);
+                if (!groups.has(origin)) {
+                    groups.set(origin, { origin, units: [], value: 0 });
+                }
+                const row = groups.get(origin);
+                row.units.push(unit);
+                row.value += Number(unit.value) || 0;
+            }
+
+            const plan = [];
+            for (const row of groups.values()) {
+                const fee = await estimateConsolidationFee(row.units.length);
+                plan.push({
+                    origin: row.origin,
+                    unitCount: row.units.length,
+                    value: row.value,
+                    fee,
+                });
+            }
+            setRefundPlan(plan);
+            setConfirmingRefund(true);
+        } catch (error) {
+            setRefundError(error.message || t('compose.unexpected'));
+        }
+    };
+
+    const handleRefund = async () => {
+        const units = getFundedUnits(participationUnits);
+        if (units.length < 1) {
+            setRefundError(t('spark.refundNeedUnits'));
+            setConfirmingRefund(false);
+            return;
+        }
+
+        setRefunding(true);
+        setRefundError(null);
+
+        try {
+            const prepared = [];
+            for (const unit of units) {
+                const full = unit.index != null && ensureUtxoHex
+                    ? await ensureUtxoHex(unit.index)
+                    : unit;
+                prepared.push(full || unit);
+            }
+
+            const result = await refundFundedUnits(prepared);
+            if (result.success) {
+                setRefundTxIds(result.transactionIds || []);
+                setConfirmingRefund(false);
+                setRefundPlan([]);
+                if (refreshRefs) await refreshRefs();
+            } else {
+                setRefundError(result.error || t('compose.unexpected'));
+                if (result.results?.length) {
+                    setRefundTxIds(
+                        result.results.map((row) => row.transactionId).filter(Boolean)
+                    );
+                }
+            }
+        } catch (error) {
+            setRefundError(error.message || t('compose.unexpected'));
+        } finally {
+            setRefunding(false);
+        }
+    };
+
     const handleImport = async () => {
         setImportError(null);
         try {
@@ -315,7 +408,8 @@ export default function Load() {
         currentPage * PAGE_SIZE + PAGE_SIZE
     );
     const fundedUnits = getFundedUnits(participationUnits);
-    const canConsolidate = Boolean(address) && fundedUnits.length >= 2 && !consolidating;
+    const canConsolidate = Boolean(address) && fundedUnits.length >= 2 && !consolidating && !refunding;
+    const canRefund = fundedUnits.length >= 1 && !refunding && !consolidating;
 
     return (
         
@@ -578,22 +672,42 @@ export default function Load() {
                             <Coins className="w-5 h-5 text-[color:var(--theme-accent)] shrink-0" />
                             <h2 className="text-xl font-bold text-white">{t('spark.fundedUnits')}</h2>
                         </div>
-                        {fundedUnits.length >= 2 && !confirmingConsolidate && (
-                            <button
-                                type="button"
-                                onClick={handleStartConsolidate}
-                                disabled={!canConsolidate}
-                                className={`flex items-center justify-center gap-2 px-3 py-2 rounded-xl border transition-all duration-300 ${
-                                    canConsolidate
-                                        ? 'bg-white/10 text-white border-white/10 hover:bg-white/20 cursor-pointer'
-                                        : 'bg-gray-200/12 text-gray-400 border-white/10 cursor-not-allowed'
-                                }`}
-                            >
-                                {consolidating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Combine className="w-4 h-4" />}
-                                <span className="text-sm font-medium">
-                                    {consolidating ? t('spark.consolidating') : t('spark.consolidate')}
-                                </span>
-                            </button>
+                        <div className="flex flex-col items-stretch sm:items-end gap-2">
+                        {fundedUnits.length >= 1 && !confirmingConsolidate && !confirmingRefund && (
+                            <div className="flex flex-wrap items-center justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={handleStartRefund}
+                                    disabled={!canRefund}
+                                    className={`flex items-center justify-center gap-2 px-3 py-2 rounded-xl border transition-all duration-300 ${
+                                        canRefund
+                                            ? 'bg-white/10 text-white border-white/10 hover:bg-white/20 cursor-pointer'
+                                            : 'bg-gray-200/12 text-gray-400 border-white/10 cursor-not-allowed'
+                                    }`}
+                                >
+                                    {refunding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Undo2 className="w-4 h-4" />}
+                                    <span className="text-sm font-medium">
+                                        {refunding ? t('spark.refunding') : t('spark.refund')}
+                                    </span>
+                                </button>
+                                {fundedUnits.length >= 2 && (
+                                    <button
+                                        type="button"
+                                        onClick={handleStartConsolidate}
+                                        disabled={!canConsolidate}
+                                        className={`flex items-center justify-center gap-2 px-3 py-2 rounded-xl border transition-all duration-300 ${
+                                            canConsolidate
+                                                ? 'bg-white/10 text-white border-white/10 hover:bg-white/20 cursor-pointer'
+                                                : 'bg-gray-200/12 text-gray-400 border-white/10 cursor-not-allowed'
+                                        }`}
+                                    >
+                                        {consolidating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Combine className="w-4 h-4" />}
+                                        <span className="text-sm font-medium">
+                                            {consolidating ? t('spark.consolidating') : t('spark.consolidate')}
+                                        </span>
+                                    </button>
+                                )}
+                            </div>
                         )}
                         {confirmingConsolidate && (
                             <div className="flex flex-col sm:flex-row sm:items-center gap-2">
@@ -627,16 +741,69 @@ export default function Load() {
                                 </div>
                             </div>
                         )}
+                        {confirmingRefund && (
+                            <div className="flex flex-col gap-3 max-w-xl">
+                                <p className="text-sm text-orange-200">
+                                    {t('spark.refundConfirm', {
+                                        count: fundedUnits.length,
+                                        origins: refundPlan.length,
+                                    })}
+                                </p>
+                                <ul className="space-y-1 text-xs text-white/55">
+                                    {refundPlan.map((row) => (
+                                        <li key={row.origin} className="font-mono break-all">
+                                            {t('spark.refundPlanRow', {
+                                                count: row.unitCount,
+                                                address: shortAddress(row.origin),
+                                                amount: formatSats(row.value, locale),
+                                                fee: formatSats(row.fee, locale),
+                                            })}
+                                        </li>
+                                    ))}
+                                </ul>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setConfirmingRefund(false);
+                                            setRefundPlan([]);
+                                        }}
+                                        disabled={refunding}
+                                        className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/10 text-white border border-white/10 hover:bg-white/20 transition-all duration-300"
+                                    >
+                                        <span className="text-sm font-medium">{t('spark.cancel')}</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleRefund}
+                                        disabled={refunding}
+                                        className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-[color:var(--theme-accent-strong)]/90 text-white border border-white/20 hover:opacity-95 transition-all duration-300"
+                                    >
+                                        {refunding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Undo2 className="w-4 h-4" />}
+                                        <span className="text-sm font-medium">
+                                            {refunding ? t('spark.refunding') : t('spark.refund')}
+                                        </span>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                        </div>
                     </div>
 
-                    {fundedUnits.length >= 2 && (
+                    {fundedUnits.length >= 1 && (
                         <p className="text-white/60 text-sm mb-5">
-                            {t('spark.consolidateHint')}
+                            {t('spark.refundHint')}
+                            {fundedUnits.length >= 2 ? ` ${t('spark.consolidateHint')}` : ''}
                         </p>
                     )}
                     {consolidateError && (
                         <div className="p-4 mb-4 text-md text-red-800 rounded-lg bg-red-50 dark:bg-red-900/20 dark:text-red-300" role="alert">
                             <span className="font-bold">{t('spark.error')}</span> {consolidateError}
+                        </div>
+                    )}
+                    {refundError && (
+                        <div className="p-4 mb-4 text-md text-red-800 rounded-lg bg-red-50 dark:bg-red-900/20 dark:text-red-300" role="alert">
+                            <span className="font-bold">{t('spark.error')}</span> {refundError}
                         </div>
                     )}
                     {consolidateTxId && (
@@ -654,6 +821,22 @@ export default function Load() {
                                     </span>
                                 ))}
                             </a>
+                        </div>
+                    )}
+                    {refundTxIds.length > 0 && (
+                        <div className="p-4 mb-5 text-md rounded-lg bg-white/5 space-y-2" role="status">
+                            <p className="text-white font-bold text-center">{t('spark.refundSuccess')}</p>
+                            {refundTxIds.map((txid) => (
+                                <a
+                                    key={txid}
+                                    href={`https://mempool.space/tx/${txid}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-white/80 hover:text-white text-center block text-sm font-mono break-all"
+                                >
+                                    {txid}
+                                </a>
+                            ))}
                         </div>
                     )}
 

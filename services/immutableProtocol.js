@@ -191,3 +191,64 @@ export function recordsFromEsploraTxs(txs, blockTime, protocolOnly = true) {
 
   return records
 }
+
+function txidFromIndex(index) {
+  return String(index || '').split('_')[0] || null
+}
+
+/**
+ * Group confirmed protocol notes by Bitcoin block time (seconds).
+ * Used to attach Speak messages / votes / comments to mined blocks.
+ */
+export function indexProtocolNotesByBlockTime(records) {
+  const byTime = new Map()
+  const messageTextByIndex = new Map()
+
+  for (const row of records || []) {
+    if (row?.unconfirmed) continue
+    const parsed = parseProtocolValue(row?.value)
+    if (parsed?.kind === 'message' && row?.index) {
+      messageTextByIndex.set(row.index, parsed.text)
+    }
+  }
+
+  for (const row of records || []) {
+    if (row?.unconfirmed) continue
+    const time = Number(row?.time)
+    if (!Number.isFinite(time)) continue
+
+    const parsed = parseProtocolValue(row?.value)
+    if (!parsed?.kind) continue
+    if (!['message', 'vote_up', 'vote_down', 'comment'].includes(parsed.kind)) continue
+
+    const note = {
+      kind: parsed.kind,
+      index: row.index,
+      txid: txidFromIndex(row.index),
+      time,
+    }
+
+    if (parsed.kind === 'message') {
+      note.text = parsed.text
+    } else if (parsed.kind === 'vote_up' || parsed.kind === 'vote_down') {
+      const targetIndex = `${parsed.hash}_${parsed.vout}`
+      note.targetIndex = targetIndex
+      note.targetText = messageTextByIndex.get(targetIndex) || null
+    } else if (parsed.kind === 'comment') {
+      note.text = parsed.text
+    }
+
+    const list = byTime.get(time)
+    if (list) list.push(note)
+    else byTime.set(time, [note])
+  }
+
+  for (const list of byTime.values()) {
+    list.sort((a, b) => {
+      const order = { message: 0, vote_up: 1, vote_down: 2, comment: 3 }
+      return (order[a.kind] ?? 9) - (order[b.kind] ?? 9)
+    })
+  }
+
+  return byTime
+}

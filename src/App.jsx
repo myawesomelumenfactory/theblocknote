@@ -7,6 +7,7 @@ import ReadPage from '../pages/ReadPage';
 import GeneratePage from '../pages/GeneratePage';
 import StatusPage from '../pages/StatusPage';
 import DirectMessagePage from '../pages/DirectMessagePage';
+import NetworkPage from '../pages/NetworkPage';
 import HowItWorksPage from '../pages/HowItWorksPage';
 import Header from '../components/Header';
 import ThemeSwitcher from '../components/ThemeSwitcher';
@@ -322,6 +323,7 @@ function App() {
                     <Route path="/generate" element={<GeneratePage />} />
                     <Route path="/status" element={<StatusPage />} />
                     <Route path="/direct" element={<DirectMessagePage />} />
+                    <Route path="/network" element={<NetworkPage />} />
                     <Route path="/how-it-works" element={<HowItWorksPage />} />
                   </Routes>
                 </div>

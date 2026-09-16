@@ -592,7 +592,7 @@ export default function LatestMessagesBlocks() {
         className="w-full"
     >
     {<GlassCard className="p-6 md:p-8">
-      <div className="flex items-start justify-between gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
           <div className="flex items-center gap-3 min-w-0">
             <Activity className="w-6 h-6 text-[color:var(--theme-accent)] shrink-0" />
             <div className="min-w-0">
@@ -610,7 +610,7 @@ export default function LatestMessagesBlocks() {
           <div
             role="group"
             aria-label={t('messages.filter')}
-            className="flex shrink-0 items-center rounded-full border border-[color:var(--theme-inset-border)] bg-[color:var(--theme-inset-bg)] p-0.5"
+            className="flex w-fit max-w-full shrink-0 items-center self-start sm:self-auto rounded-full border border-[color:var(--theme-inset-border)] bg-[color:var(--theme-inset-bg)] p-0.5"
           >
             {sortModes.map((mode) => {
               const active = sortMode === mode.id;

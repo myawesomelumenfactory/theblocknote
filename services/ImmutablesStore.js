@@ -36,6 +36,19 @@ export function mergeImmutables(base, extra) {
   return [...byIndex.values()]
 }
 
+/** Live snapshot of confirmed + overlay protocol records (no catch-up). */
+export function getImmutableRecords() {
+  return mergeImmutables(readStoredRecords(), readImmutablesOverlay())
+}
+
+export function subscribeImmutables(onUpdate) {
+  if (typeof window === 'undefined') return () => {}
+  const notify = () => onUpdate(getImmutableRecords())
+  notify()
+  window.addEventListener('theblocknote:immutables', notify)
+  return () => window.removeEventListener('theblocknote:immutables', notify)
+}
+
 function readStoredRecords() {
   try {
     const parsed = JSON.parse(localStorage.getItem(RECORDS_KEY) || '[]')
@@ -289,7 +302,9 @@ function startCatchUp(lastHeight, { force = false } = {}) {
 export async function loadImmutableRecords(bundledRecords, bundledState) {
   const snapshot = hydrateFromBundled(bundledRecords, bundledState)
   startCatchUp(snapshot.state.lastHeight)
-  return mergeImmutables(snapshot.records, readImmutablesOverlay())
+  const records = mergeImmutables(snapshot.records, readImmutablesOverlay())
+  emitImmutablesUpdated()
+  return records
 }
 
 /**

@@ -4,6 +4,7 @@ import ECPairFactory from 'ecpair';
 import * as bitcoin from 'bitcoinjs-lib';
 import { encodeComment, cleanCommentText, COMMENT_TEXT_MAX, encodeMessage } from './immutableProtocol.js';
 import { estimateConsolidationFee, isValidAddress } from './BitcoinUtils';
+import { explorerJson } from './BlockstreamExplorer.js';
 
 const ECPair = ECPairFactory(ecc);
 const P2PKH_DUST = 546;
@@ -349,8 +350,8 @@ export async function createConsolidationTransaction(units, destinationAddress, 
   const network = bitcoin.networks.bitcoin;
   const funded = getFundedUnits(units);
 
-  if (funded.length < 2) {
-    throw new Error('Need at least two funded units to consolidate');
+  if (funded.length < 1) {
+    throw new Error('Need at least one funded unit');
   }
 
   if (!destinationAddress || !isValidAddress(destinationAddress, network)) {
@@ -379,15 +380,14 @@ export async function createConsolidationTransaction(units, destinationAddress, 
 }
 
 /**
- * Spend every funded unit into a single P2PKH output
- * @param {Array} units
- * @param {string} destinationAddress
- * @param {number} [fee]
- * @returns {Promise<Object>}
+ * Spend funded unit(s) into a single output (1+ inputs).
  */
-export async function consolidateFundedUnits(units, destinationAddress, fee) {
+export async function sendUnitsToAddress(units, destinationAddress, fee) {
   try {
     const funded = getFundedUnits(units);
+    if (funded.length < 1) {
+      throw new Error('Need at least one funded unit');
+    }
     const resolvedFee = fee == null
       ? await estimateConsolidationFee(funded.length)
       : fee;
@@ -404,14 +404,138 @@ export async function consolidateFundedUnits(units, destinationAddress, fee) {
       fee: resolvedFee,
       outputValue,
       inputCount: funded.length,
+      destinationAddress,
     };
   } catch (error) {
-    console.error('Consolidation failed:', error.message);
+    console.error('Send units failed:', error.message);
     return {
       success: false,
       error: error.message,
       rawTxHex: error.rawTxHex || null,
+      destinationAddress,
     };
+  }
+}
+
+/**
+ * Spend every funded unit into a single P2PKH output
+ * @param {Array} units
+ * @param {string} destinationAddress
+ * @param {number} [fee]
+ * @returns {Promise<Object>}
+ */
+export async function consolidateFundedUnits(units, destinationAddress, fee) {
+  const funded = getFundedUnits(units);
+  if (funded.length < 2) {
+    return {
+      success: false,
+      error: 'Need at least two funded units to consolidate',
+      rawTxHex: null,
+    };
+  }
+  return sendUnitsToAddress(funded, destinationAddress, fee);
+}
+
+/**
+ * Find the external address that funded a unit (largest non-self input on the creating tx).
+ */
+export async function resolveFundingOriginAddress(unit) {
+  const txid = String(unit?.tx_hash || '').replace(/[^a-f0-9]/gi, '')
+  if (!txid) throw new Error('Unit is missing its funding transaction id')
+
+  const tx = await explorerJson(`/tx/${txid}`)
+  if (!tx?.vin?.length) {
+    throw new Error(`Could not load funding transaction ${txid}`)
+  }
+
+  const self = unit.public_key
+  const totals = new Map()
+
+  for (const vin of tx.vin) {
+    if (vin.is_coinbase) continue
+    const addr = vin.prevout?.scriptpubkey_address
+    const value = Number(vin.prevout?.value) || 0
+    if (!addr || !isValidAddress(addr)) continue
+    if (self && addr === self) continue
+    totals.set(addr, (totals.get(addr) || 0) + value)
+  }
+
+  let best = null
+  let bestValue = -1
+  for (const [addr, value] of totals) {
+    if (value > bestValue) {
+      best = addr
+      bestValue = value
+    }
+  }
+
+  if (best) return best
+
+  // Fallback: first input address (may be self after consolidation).
+  for (const vin of tx.vin) {
+    const addr = vin.prevout?.scriptpubkey_address
+    if (addr && isValidAddress(addr)) return addr
+  }
+
+  throw new Error(`No origin address found for unit ${txid}`)
+}
+
+/**
+ * Refund every funded unit to the address that originally paid it.
+ * Units that share an origin are batched into one transaction.
+ */
+export async function refundFundedUnits(units) {
+  try {
+    const funded = getFundedUnits(units)
+    if (funded.length < 1) {
+      throw new Error('Need at least one funded unit to refund')
+    }
+
+    for (const unit of funded) {
+      if (!validateUTXO(unit)) {
+        throw new Error('A funded unit is missing the data needed to sign')
+      }
+    }
+
+    const groups = new Map()
+    for (const unit of funded) {
+      const origin = await resolveFundingOriginAddress(unit)
+      if (!groups.has(origin)) groups.set(origin, [])
+      groups.get(origin).push(unit)
+    }
+
+    const results = []
+    for (const [origin, group] of groups) {
+      const fee = await estimateConsolidationFee(group.length)
+      const result = await sendUnitsToAddress(group, origin, fee)
+      results.push({
+        origin,
+        unitCount: group.length,
+        ...result,
+      })
+      if (!result.success) {
+        return {
+          success: false,
+          error: result.error || `Refund to ${origin} failed`,
+          results,
+        }
+      }
+    }
+
+    return {
+      success: true,
+      results,
+      transactionIds: results.map((row) => row.transactionId).filter(Boolean),
+      originCount: groups.size,
+      inputCount: funded.length,
+    }
+  } catch (error) {
+    console.error('Refund failed:', error.message)
+    return {
+      success: false,
+      error: error.message,
+      results: [],
+    }
   }
 }
 
