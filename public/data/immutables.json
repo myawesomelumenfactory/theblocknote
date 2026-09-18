@@ -1073,5 +1073,50 @@
     "index": "b361196d052aebe1d7d893e7bb6392f16ac6708ce1f98f7c4b318c04aeeaaddb_0",
     "time": 1789567956,
     "value": "t 0 0 \"Macklemore: All humans treated equal should never be controversial.\""
+  },
+  {
+    "index": "ccf449f11d440e752991ca029767fdd55a17e07d1f371c9b2b79a38cb4b3ac42_0",
+    "time": 1789720274,
+    "value": "t 0 0 \"GAFAM: You will not remove this messge but you're on the line next.\""
+  },
+  {
+    "index": "1dc27cb449894399f0573a4e74f79f1d443009cda461431f924f9aca827e5c0b_0",
+    "time": 1789720391,
+    "value": "t 0 2 ccf449f11d44 0 \"Even mistakes will be recorded and judged here.\""
+  },
+  {
+    "index": "fd556f9b4eca5e499be6f2e297c4d1b94d442063b6bd8ea03afb04faf9d234d0_0",
+    "time": 1789720495,
+    "value": "t 0 2 ccf449f11d44 0 \"Bitcoin technology cannot and will not be stopped\""
+  },
+  {
+    "index": "b9306085dd88a73d380270c8b5c3bde0a9f5ceb062d25956cfe892d8fef93d9c_0",
+    "time": 1789720784,
+    "value": "t 0 0 \"Bitcoin's not is dead. More alive than never.\""
+  },
+  {
+    "index": "eb0c00439c34742871e5a59962b3e52038423d099ba642a7ba4ed616692edd95_0",
+    "time": 1789720929,
+    "value": "t 0 0 \"This is a stand for all prisoners of conscience around the world.\""
+  },
+  {
+    "index": "b452ed4c78d4ba043ef43cb7b0a21be3d4632a25530984d56f2c24df898f4d60_0",
+    "time": 1789721095,
+    "value": "t 0 0 \"Bitcoin's not dead. More alive than never.\""
+  },
+  {
+    "index": "89e1477045cc4ea0ab6fedb4e1a6ae187208d977ba2303c7c89fc2e03c83844b_0",
+    "time": 1789721138,
+    "value": "t 0 2 b452ed4c78d4 0 \"Sometimes you have to fix your previous mistakes\""
+  },
+  {
+    "index": "d8a820c070ce9e4d61aeacfc535d18d6c11da300212271c6a223050ec68ecac1_0",
+    "time": 1789721158,
+    "value": "t 0 -1 b9306085dd88a73d380270c8b5c3bde0a9f5ceb062d25956cfe892d8fef93d9c 0"
+  },
+  {
+    "index": "d5b8eb4539d5e5523355e7b0f922f139f1d397a2852be3c6da98417b3ff78a2f_0",
+    "time": 1789721243,
+    "value": "t 0 1 b452ed4c78d4ba043ef43cb7b0a21be3d4632a25530984d56f2c24df898f4d60 0"
   }
 ]
