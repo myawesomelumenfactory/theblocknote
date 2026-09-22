@@ -137,6 +137,56 @@ export function commentBelongsToMessage(comment, messageIndex) {
   return Boolean(matchesPrefix) && Number(vout) === Number(comment.vout)
 }
 
+/** Protocol type for The Pulse consensus-radio song votes. */
+export const PULSE_VOTE_TYPE = '8'
+
+/** Provider code for Spotify track votes. */
+export const PULSE_PROVIDER_SPOTIFY = 's'
+
+/** Spotify track ids are 22-char base62. */
+export const SPOTIFY_TRACK_ID_RE = /^[0-9A-Za-z]{22}$/
+
+/**
+ * Consensus radio vote OP_RETURN (fits a simple ≤75-byte push):
+ *   t 0 8 s <spotifyTrackId>
+ *
+ * Each confirmed line is one vote for that track. Rank = vote count.
+ * Provider letter keeps the door open for other catalogs later (e.g. y = youtube).
+ */
+export function encodePulseVote(trackId, provider = PULSE_PROVIDER_SPOTIFY) {
+  const id = String(trackId || '').trim()
+  const prov = String(provider || PULSE_PROVIDER_SPOTIFY).trim().toLowerCase()
+  if (prov !== PULSE_PROVIDER_SPOTIFY) {
+    throw new Error('Unsupported pulse provider')
+  }
+  if (!SPOTIFY_TRACK_ID_RE.test(id)) {
+    throw new Error('Invalid Spotify track id')
+  }
+  const encoded = `t 0 ${PULSE_VOTE_TYPE} ${prov} ${id}`
+  if (utf8ByteLength(encoded) > OP_RETURN_SIMPLE_PUSH_MAX) {
+    throw new Error('Pulse vote exceeds the OP_RETURN simple-push limit')
+  }
+  return encoded
+}
+
+export function parsePulseVoteValue(value) {
+  const parts = tokenizeProtocolValue(value)
+  if (!parts || parts.length < 5) return null
+  if (parts[0] !== 't') return null
+  if (String(parts[2]) !== PULSE_VOTE_TYPE) return null
+
+  const provider = String(parts[3] || '').toLowerCase()
+  const trackId = String(parts[4] || '').trim()
+  if (provider !== PULSE_PROVIDER_SPOTIFY) return null
+  if (!SPOTIFY_TRACK_ID_RE.test(trackId)) return null
+
+  return {
+    kind: 'pulse_vote',
+    provider,
+    trackId,
+  }
+}
+
 /**
  * Classify a stored protocol value for indexers / UI reconstruction.
  */
@@ -157,6 +207,9 @@ export function parseProtocolValue(value) {
   }
   if (type === '2') {
     return parseCommentValue(value)
+  }
+  if (type === PULSE_VOTE_TYPE) {
+    return parsePulseVoteValue(value)
   }
   return { kind: 'other', type, parts }
 }

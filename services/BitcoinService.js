@@ -2,7 +2,7 @@
 import * as ecc from 'tiny-secp256k1';
 import ECPairFactory from 'ecpair';
 import * as bitcoin from 'bitcoinjs-lib';
-import { encodeComment, cleanCommentText, COMMENT_TEXT_MAX, encodeMessage } from './immutableProtocol.js';
+import { encodeComment, cleanCommentText, COMMENT_TEXT_MAX, encodeMessage, encodePulseVote } from './immutableProtocol.js';
 import { estimateConsolidationFee, isValidAddress } from './BitcoinUtils';
 import { explorerJson } from './BlockstreamExplorer.js';
 
@@ -722,6 +722,34 @@ export async function applyComment(utxo, hash, index, text, fee = 450) {
     };
   } catch (error) {
     console.error('Comment failed:', error.message);
+    return {
+      success: false,
+      error: error.message,
+      rawTxHex: error.rawTxHex || null,
+    };
+  }
+}
+
+/**
+ * Vote for a Spotify track on The Pulse consensus radio.
+ * Protocol: t 0 8 s <spotifyTrackId>
+ */
+export async function applyPulseVote(utxo, trackId, fee = 450) {
+  try {
+    const encoded = encodePulseVote(trackId);
+    const rawTxHex = await createTransaction(utxo, encoded, fee);
+    const transactionId = await broadcastTransaction(rawTxHex);
+
+    return {
+      success: true,
+      transactionId: transactionId.replace(/[^a-f0-9]/gi, ''),
+      rawTxHex,
+      encoded,
+      trackId,
+      explorerUrl: `https://mempool.space/tx/${transactionId.replace(/[^a-f0-9]/gi, '')}`,
+    };
+  } catch (error) {
+    console.error('Pulse vote failed:', error.message);
     return {
       success: false,
       error: error.message,

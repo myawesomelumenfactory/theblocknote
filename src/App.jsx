@@ -7,7 +7,10 @@ import ReadPage from '../pages/ReadPage';
 import GeneratePage from '../pages/GeneratePage';
 import StatusPage from '../pages/StatusPage';
 import DirectMessagePage from '../pages/DirectMessagePage';
+import DirectStreamPage from '../pages/DirectStreamPage';
 import NetworkPage from '../pages/NetworkPage';
+// Pulse page hidden for now — re-enable import + /pulse route when ready.
+// import PulsePage from '../pages/PulsePage';
 import HowItWorksPage from '../pages/HowItWorksPage';
 import Header from '../components/Header';
 import ThemeSwitcher from '../components/ThemeSwitcher';
@@ -323,7 +326,9 @@ function App() {
                     <Route path="/generate" element={<GeneratePage />} />
                     <Route path="/status" element={<StatusPage />} />
                     <Route path="/direct" element={<DirectMessagePage />} />
+                    <Route path="/stream" element={<DirectStreamPage />} />
                     <Route path="/network" element={<NetworkPage />} />
+                    {/* <Route path="/pulse" element={<PulsePage />} /> */}
                     <Route path="/how-it-works" element={<HowItWorksPage />} />
                   </Routes>
                 </div>

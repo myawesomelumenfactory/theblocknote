@@ -7,6 +7,7 @@ import { nodePolyfills } from 'vite-plugin-node-polyfills'
 import { viteSingleFile } from 'vite-plugin-singlefile'
 import wasm from 'vite-plugin-wasm';
 import { blockstreamEnterpriseProxy } from './plugins/blockstreamEnterpriseProxy.js'
+import { spotifySearchProxy } from './plugins/spotifySearchProxy.js'
 import { immutablesAppend } from './plugins/immutablesAppend.js'
 import { livePresence } from './plugins/livePresence.js'
 
@@ -72,6 +73,7 @@ export default defineConfig(({ mode }) => {
       livePresence(),
       serveDataDir(),
       blockstreamEnterpriseProxy(env),
+      spotifySearchProxy(env),
       nodePolyfills({
         protocolImports: true,
         globals: {
