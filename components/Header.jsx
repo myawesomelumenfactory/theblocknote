@@ -135,23 +135,6 @@ export default function Header() {
                 >
                   <span className="font-medium">{t('nav.about')}</span>
                 </Link>
-                <NavLink
-                  to="/stream"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={({ isActive }) =>
-                    `flex w-full md:w-auto items-center justify-center md:justify-start gap-2 px-4 py-3 md:py-2 rounded-xl transition-all duration-300 border font-semibold ${
-                      isActive
-                        ? 'bg-red-600 text-white border-red-400 shadow-[0_0_20px_rgba(220,38,38,0.35)]'
-                        : 'bg-red-600/90 text-white border-red-500/80 hover:bg-red-500 hover:text-white'
-                    }`
-                  }
-                >
-                  <span className="relative flex h-2 w-2">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-70" />
-                    <span className="relative inline-flex h-2 w-2 rounded-full bg-white" />
-                  </span>
-                  <span>{t('nav.stream')}</span>
-                </NavLink>
                 <div className="flex w-full md:w-auto justify-center md:justify-start py-1">
                   <LanguageSwitcher onSelect={() => setMobileMenuOpen(false)} />
                 </div>

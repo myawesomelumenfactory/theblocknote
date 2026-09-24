@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { Inbox, Loader2, ExternalLink } from 'lucide-react'
 import { fetchAddressDirectMessages } from '../services/addressImmutables'
 import { isValidAddress } from '../services/BitcoinUtils'
@@ -19,7 +19,7 @@ function formatTimestampToUTC(timestampInSeconds) {
   return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss} UTC`
 }
 
-export default function DirectInbox({ initialAddress = '' }) {
+export default function DirectInbox({ initialAddress = '', autoLoad = false }) {
   const { t } = useLanguage()
   const [address, setAddress] = useState(initialAddress)
   const [messages, setMessages] = useState([])
@@ -30,12 +30,15 @@ export default function DirectInbox({ initialAddress = '' }) {
   const trimmed = address.trim()
   const canLoad = trimmed.length > 0 && isValidAddress(trimmed)
 
-  const handleLoad = async () => {
-    if (!trimmed) {
+  const handleLoad = useCallback(async (overrideAddress) => {
+    const target = String(
+      typeof overrideAddress === 'string' ? overrideAddress : address
+    ).trim()
+    if (!target) {
       setError(t('direct.enterAddress'))
       return
     }
-    if (!isValidAddress(trimmed)) {
+    if (!isValidAddress(target)) {
       setError(t('direct.invalidAddress'))
       return
     }
@@ -44,9 +47,9 @@ export default function DirectInbox({ initialAddress = '' }) {
     setError(null)
 
     try {
-      const records = await fetchAddressDirectMessages(trimmed)
+      const records = await fetchAddressDirectMessages(target)
       setMessages(records)
-      setLoadedAddress(trimmed)
+      setLoadedAddress(target)
     } catch (err) {
       console.error('Address inbox error:', err)
       setMessages([])
@@ -55,7 +58,21 @@ export default function DirectInbox({ initialAddress = '' }) {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [address, t])
+
+  useEffect(() => {
+    const next = String(initialAddress || '').trim()
+    setAddress(next)
+  }, [initialAddress])
+
+  useEffect(() => {
+    if (!autoLoad) return
+    const next = String(initialAddress || '').trim()
+    if (!next || !isValidAddress(next)) return
+    handleLoad(next)
+    // Only auto-fetch when the URL address changes, not when handleLoad identity changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialAddress, autoLoad])
 
   return (
     <div>
