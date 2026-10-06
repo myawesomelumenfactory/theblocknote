@@ -9,6 +9,7 @@ import StatusPage from '../pages/StatusPage';
 import DirectMessagePage from '../pages/DirectMessagePage';
 import DirectStreamPage from '../pages/DirectStreamPage';
 import MessagesPage from '../pages/MessagesPage';
+import MapPage from '../pages/MapPage';
 import NetworkPage from '../pages/NetworkPage';
 // Pulse page hidden for now — re-enable import + /pulse route when ready.
 // import PulsePage from '../pages/PulsePage';
@@ -330,6 +331,7 @@ function App() {
                     <Route path="/messages/:address" element={<MessagesPage />} />
                     <Route path="/stream" element={<DirectStreamPage />} />
                     <Route path="/network" element={<NetworkPage />} />
+                    <Route path="/map" element={<MapPage />} />
                     {/* <Route path="/pulse" element={<PulsePage />} /> */}
                     <Route path="/how-it-works" element={<HowItWorksPage />} />
                   </Routes>

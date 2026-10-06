@@ -20,6 +20,7 @@
     "bitcoinjs-lib": "^6.1.7",
     "buffer": "^6.0.3",
     "crypto": "^1.0.1",
+    "d3-geo": "^3.1.1",
     "date-fns": "^4.1.0",
     "ecpair": "^3.0.0",
     "framer-motion": "^12.23.6",
@@ -34,8 +35,10 @@
     "reconnecting-websocket": "^4.4.0",
     "rollup-plugin-node-polyfills": "^0.2.1",
     "tiny-secp256k1": "^2.2.4",
+    "topojson-client": "^3.1.0",
     "utils": "^0.3.1",
-    "vite-plugin-wasm": "^3.5.0"
+    "vite-plugin-wasm": "^3.5.0",
+    "world-atlas": "^2.0.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",

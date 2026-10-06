@@ -2,7 +2,7 @@
 import * as ecc from 'tiny-secp256k1';
 import ECPairFactory from 'ecpair';
 import * as bitcoin from 'bitcoinjs-lib';
-import { encodeComment, cleanCommentText, COMMENT_TEXT_MAX, encodeMessage, encodePulseVote } from './immutableProtocol.js';
+import { encodeComment, cleanCommentText, COMMENT_TEXT_MAX, encodeMessage, encodePulseVote, encodeCountryVote } from './immutableProtocol.js';
 import { estimateConsolidationFee, isValidAddress } from './BitcoinUtils';
 import { explorerJson } from './BlockstreamExplorer.js';
 
@@ -750,6 +750,34 @@ export async function applyPulseVote(utxo, trackId, fee = 450) {
     };
   } catch (error) {
     console.error('Pulse vote failed:', error.message);
+    return {
+      success: false,
+      error: error.message,
+      rawTxHex: error.rawTxHex || null,
+    };
+  }
+}
+
+/**
+ * Upvote a country on the world map.
+ * Protocol: t 0 7 <countryCode>
+ */
+export async function applyCountryVote(utxo, countryCode, fee = 450) {
+  try {
+    const encoded = encodeCountryVote(countryCode);
+    const rawTxHex = await createTransaction(utxo, encoded, fee);
+    const transactionId = await broadcastTransaction(rawTxHex);
+
+    return {
+      success: true,
+      transactionId: transactionId.replace(/[^a-f0-9]/gi, ''),
+      rawTxHex,
+      encoded,
+      countryCode,
+      explorerUrl: `https://mempool.space/tx/${transactionId.replace(/[^a-f0-9]/gi, '')}`,
+    };
+  } catch (error) {
+    console.error('Country vote failed:', error.message);
     return {
       success: false,
       error: error.message,
