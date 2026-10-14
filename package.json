@@ -9,10 +9,12 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "index:immutables": "node scripts/fetch-immutables.js",
-    "immutables:service": "node scripts/immutables-service.js"
+    "immutables:service": "node scripts/immutables-service.js",
+    "declarations:pin": "node scripts/declarations-pinner.js"
   },
   "dependencies": {
     "@esbuild-plugins/node-globals-polyfill": "^0.2.3",
+    "@noble/hashes": "^1.8.0",
     "@tailwindcss/vite": "^4.1.11",
     "axios": "^1.11.0",
     "bip32": "^5.0.0-rc.0",
@@ -20,10 +22,12 @@
     "bitcoinjs-lib": "^6.1.7",
     "buffer": "^6.0.3",
     "crypto": "^1.0.1",
+    "d3-geo": "^3.1.1",
     "date-fns": "^4.1.0",
     "ecpair": "^3.0.0",
     "framer-motion": "^12.23.6",
     "lucide-react": "^0.525.0",
+    "nostr-tools": "^2.25.2",
     "qr-code-styling": "^1.9.2",
     "qrcode.react": "^4.2.0",
     "react": "^19.1.0",
@@ -34,8 +38,10 @@
     "reconnecting-websocket": "^4.4.0",
     "rollup-plugin-node-polyfills": "^0.2.1",
     "tiny-secp256k1": "^2.2.4",
+    "topojson-client": "^3.1.0",
     "utils": "^0.3.1",
-    "vite-plugin-wasm": "^3.5.0"
+    "vite-plugin-wasm": "^3.5.0",
+    "world-atlas": "^2.0.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",

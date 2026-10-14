@@ -50,71 +50,98 @@ html[data-theme="bitcoin-orange"] {
   --theme-bg-mark-glyph: #fff8ef;
 }
 
-/* Light Bitcoin Orange: remap common dark-theme utilities to ink on white. */
-html[data-theme="bitcoin-orange"] .text-white {
+html[data-theme="timeline"] {
+  --app-zoom: 0.75;
+  --theme-body: #ffffff;
+  --theme-bg: linear-gradient(#ffffff, #ffffff);
+  --theme-accent: #1d9bf0;
+  --theme-accent-strong: #1d9bf0;
+  --theme-accent-soft: #1d9bf0;
+  --theme-nav-active-bg: #1d9bf0;
+  --theme-nav-active-border: #1d9bf0;
+  --theme-nav-active-shadow: none;
+  --theme-card-bg: #ffffff;
+  --theme-card-border: #eff3f4;
+  --theme-chip-bg: #f7f9f9;
+  --theme-fg: #0f1419;
+  --theme-fg-muted: #536471;
+  --theme-fg-subtle: #8b98a5;
+  --theme-panel-shadow: none;
+  --theme-card-blur: 0px;
+  --theme-inset-bg: #eff3f4;
+  --theme-inset-border: #cfd9de;
+  --theme-bg-mark-glyph: #ffffff;
+}
+
+html[data-theme="timeline"] body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+html[data-theme="timeline"] .bitcoin-background-mark {
+  display: none;
+}
+
+/* Light themes: remap common dark-theme utilities to ink on white. */
+html:is([data-theme="bitcoin-orange"], [data-theme="timeline"]) .text-white {
   color: var(--theme-fg);
 }
-html[data-theme="bitcoin-orange"] .text-white\/80 {
+html:is([data-theme="bitcoin-orange"], [data-theme="timeline"]) .text-white\/90 {
+  color: rgba(22, 22, 22, 0.9);
+}
+html:is([data-theme="bitcoin-orange"], [data-theme="timeline"]) .text-white\/80 {
   color: rgba(22, 22, 22, 0.82);
 }
-html[data-theme="bitcoin-orange"] .text-white\/70 {
+html:is([data-theme="bitcoin-orange"], [data-theme="timeline"]) .text-white\/70 {
   color: rgba(22, 22, 22, 0.72);
 }
-html[data-theme="bitcoin-orange"] .text-white\/60 {
+html:is([data-theme="bitcoin-orange"], [data-theme="timeline"]) .text-white\/60 {
   color: rgba(22, 22, 22, 0.62);
 }
-html[data-theme="bitcoin-orange"] .text-white\/55 {
+html:is([data-theme="bitcoin-orange"], [data-theme="timeline"]) .text-white\/55 {
   color: rgba(22, 22, 22, 0.55);
 }
-html[data-theme="bitcoin-orange"] .text-white\/50 {
+html:is([data-theme="bitcoin-orange"], [data-theme="timeline"]) .text-white\/50 {
   color: rgba(22, 22, 22, 0.5);
 }
-html[data-theme="bitcoin-orange"] .text-white\/45 {
+html:is([data-theme="bitcoin-orange"], [data-theme="timeline"]) .text-white\/45 {
   color: rgba(22, 22, 22, 0.45);
 }
-html[data-theme="bitcoin-orange"] .text-white\/40 {
+html:is([data-theme="bitcoin-orange"], [data-theme="timeline"]) .text-white\/40 {
   color: rgba(22, 22, 22, 0.4);
 }
-html[data-theme="bitcoin-orange"] .text-white\/35 {
+html:is([data-theme="bitcoin-orange"], [data-theme="timeline"]) .text-white\/35 {
   color: rgba(22, 22, 22, 0.35);
 }
-html[data-theme="bitcoin-orange"] .text-white\/30 {
+html:is([data-theme="bitcoin-orange"], [data-theme="timeline"]) .text-white\/30 {
   color: rgba(22, 22, 22, 0.3);
 }
-html[data-theme="bitcoin-orange"] .placeholder-white\/40::placeholder {
+html:is([data-theme="bitcoin-orange"], [data-theme="timeline"]) .placeholder-white\/40::placeholder {
   color: rgba(22, 22, 22, 0.4);
 }
-html[data-theme="bitcoin-orange"] .bg-white\/10,
-html[data-theme="bitcoin-orange"] .bg-white\/5,
-html[data-theme="bitcoin-orange"] .bg-white-400\/20,
-html[data-theme="bitcoin-orange"] .bg-white-900\/30,
-html[data-theme="bitcoin-orange"] .bg-white-900\/20,
-html[data-theme="bitcoin-orange"] .bg-white-900\/10,
-html[data-theme="bitcoin-orange"] .bg-gray-200\/12 {
+html:is([data-theme="bitcoin-orange"], [data-theme="timeline"]) :is(.bg-white\/10, .bg-white\/5, .bg-white-400\/20, .bg-white-900\/30, .bg-white-900\/20, .bg-white-900\/10, .bg-gray-200\/12) {
   background-color: var(--theme-inset-bg);
 }
-html[data-theme="bitcoin-orange"] .hover\:bg-white\/10:hover,
-html[data-theme="bitcoin-orange"] .hover\:bg-white\/12:hover,
-html[data-theme="bitcoin-orange"] .hover\:bg-white\/20:hover {
+html[data-theme="bitcoin-orange"] :is(.hover\:bg-white\/10, .hover\:bg-white\/12, .hover\:bg-white\/20):hover {
   background-color: rgba(247, 147, 26, 0.12);
 }
-html[data-theme="bitcoin-orange"] .border-white\/10,
-html[data-theme="bitcoin-orange"] .border-white\/20 {
+html[data-theme="timeline"] :is(.hover\:bg-white\/10, .hover\:bg-white\/12, .hover\:bg-white\/20, .hover\:bg-white\/\[0\.03\], .hover\:bg-white\/\[0\.06\]):hover {
+  background-color: rgba(15, 20, 25, 0.04);
+}
+html[data-theme="bitcoin-orange"] :is(.border-white\/10, .border-white\/20) {
   border-color: rgba(40, 24, 8, 0.12);
 }
-html[data-theme="bitcoin-orange"] .hover\:text-white:hover {
+html[data-theme="timeline"] :is(.border-white\/10, .border-white\/20) {
+  border-color: var(--theme-card-border);
+}
+html:is([data-theme="bitcoin-orange"], [data-theme="timeline"]) .hover\:text-white:hover {
   color: #000000;
 }
-html[data-theme="bitcoin-orange"] .hover\:text-white\/80:hover,
-html[data-theme="bitcoin-orange"] .hover\:text-white\/60:hover {
+html:is([data-theme="bitcoin-orange"], [data-theme="timeline"]) :is(.hover\:text-white\/80, .hover\:text-white\/60):hover {
   color: rgba(0, 0, 0, 0.75);
 }
 
-/* Active chrome stays orange with white labels on the light theme. */
-html[data-theme="bitcoin-orange"] a[aria-current="page"],
-html[data-theme="bitcoin-orange"] .chrome-toggle > button[aria-pressed="true"],
-html[data-theme="bitcoin-orange"] .compose-fee-btn[aria-pressed="true"],
-html[data-theme="bitcoin-orange"] .compose-fee-btn[aria-pressed="true"] span {
+/* Active chrome keeps the accent fill with white labels on light themes. */
+html:is([data-theme="bitcoin-orange"], [data-theme="timeline"]) :is(a[aria-current="page"], .chrome-toggle > button[aria-pressed="true"], .compose-fee-btn[aria-pressed="true"], .compose-fee-btn[aria-pressed="true"] span) {
   color: #ffffff !important;
 }
 
@@ -131,6 +158,20 @@ html, body, #root {
     height: 100%;
     margin: 0;
   }
+
+html {
+    --app-zoom: 0.6;
+    zoom: var(--app-zoom);
+}
+
+/* vh units shrink with zoom; scale them back up so full-screen layouts still fill the window. */
+html .h-screen {
+    height: calc(100vh / var(--app-zoom));
+}
+
+html .min-h-screen {
+    min-height: calc(100vh / var(--app-zoom));
+}
 
 .theme-glass {
   -webkit-backdrop-filter: blur(var(--theme-card-blur));
@@ -176,6 +217,11 @@ html[data-theme="deep-ledger"] .compose-send-btn,
 html[data-theme="deep-ledger"] .compose-send-btn span,
 html[data-theme="deep-ledger"] .compose-send-btn svg {
   color: #000000 !important;
+}
+
+html[data-theme="timeline"] .compose-send-btn {
+  background-color: #1d9bf0 !important;
+  border-color: #1d9bf0 !important;
 }
 
 .messages-sort-btn,

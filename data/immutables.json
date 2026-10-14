@@ -1118,5 +1118,365 @@
     "index": "d5b8eb4539d5e5523355e7b0f922f139f1d397a2852be3c6da98417b3ff78a2f_0",
     "time": 1789721243,
     "value": "t 0 1 b452ed4c78d4ba043ef43cb7b0a21be3d4632a25530984d56f2c24df898f4d60 0"
+  },
+  {
+    "index": "af30257988e2117f9a159fe8f7d833d9f2a80f25843cdb6c9b3d1364aa57de7e_0",
+    "time": 1789376135,
+    "value": "t 0 0 \"Immigration has never been a problem. Corruption is.\"",
+    "kind": "message"
+  },
+  {
+    "index": "c8e4a9c1d73077ca6407a1c1968e943c4119bffe44451bcd286e1e8ae6b172b4_0",
+    "time": 1789390873,
+    "value": "t 0 0 \"Reddit blocked me. Bitcoin did not.\"",
+    "kind": "message"
+  },
+  {
+    "index": "76a1bc74bf703e7227bf614a6951c21f5ca1a50a082c40c308a32c1ecba1b6cf_0",
+    "time": 1789392435,
+    "value": "t 0 0 \"Bitcoin: a book anyone reads; only proven work can seal a page.\"",
+    "kind": "message"
+  },
+  {
+    "index": "2398fee71a9ee44c7ff393ce855efc390a16aa0d522262561d281a38cfc4a009_0",
+    "time": 1789399517,
+    "value": "t 0 1 c8e4a9c1d73077ca6407a1c1968e943c4119bffe44451bcd286e1e8ae6b172b4 0",
+    "kind": "vote_up"
+  },
+  {
+    "index": "d1d96226440542dd8849164663e3edf465ef662979785659f7ad2ba8723ad065_0",
+    "time": 1789399517,
+    "value": "t 0 1 c8e4a9c1d73077ca6407a1c1968e943c4119bffe44451bcd286e1e8ae6b172b4 0",
+    "kind": "vote_up"
+  },
+  {
+    "index": "4f14817d8170de9dfa79105e3b109a25e52c20d90f6cf1b224785024e3f6f738_0",
+    "time": 1789399517,
+    "value": "t 0 1 c8e4a9c1d73077ca6407a1c1968e943c4119bffe44451bcd286e1e8ae6b172b4 0",
+    "kind": "vote_up"
+  },
+  {
+    "index": "15dbd1885f8c82ec0a6593b7b7319e09a7dd713c540375c2c9caf87827ea43cd_0",
+    "time": 1789399517,
+    "value": "t 0 1 c8e4a9c1d73077ca6407a1c1968e943c4119bffe44451bcd286e1e8ae6b172b4 0",
+    "kind": "vote_up"
+  },
+  {
+    "index": "9e2b2e74051d519ff9cacd7982bf55b0512f28f1224ad2639acfc151c0a33d84_0",
+    "time": 1789409938,
+    "value": "t 0 0 \"Don't Trust. Verify. On theblocknote.eth.link\"",
+    "kind": "message"
+  },
+  {
+    "index": "56f0433545f6b386c4176bba3962cd12d168103687a0fb1584dfc81be3fc01a9_0",
+    "time": 1789412935,
+    "value": "t 0 2 af30257988e2 0 \"And the mismanagement by the elites.\"",
+    "kind": "comment"
+  },
+  {
+    "index": "105a00765b8e0b604d1182c0a2ccb89bcb017165b893b5fa62db468a362b4b41_0",
+    "time": 1789412935,
+    "value": "t 0 1 c8e4a9c1d73077ca6407a1c1968e943c4119bffe44451bcd286e1e8ae6b172b4 0",
+    "kind": "vote_up"
+  },
+  {
+    "index": "22bc264a84dfbff165706f3d4296535b53ad6f0ac68c09d84e16455e656b59c1_0",
+    "time": 1789418882,
+    "value": "t 0 2 c8e4a9c1d730 0 \"Everything else is manipulated.\"",
+    "kind": "comment"
+  },
+  {
+    "index": "98043f27b76326094b09255f229ff662c47dcae24ad0324395e74eaee5c3dc9e_0",
+    "time": 1789424941,
+    "value": "t 0 1 c8e4a9c1d73077ca6407a1c1968e943c4119bffe44451bcd286e1e8ae6b172b4 0",
+    "kind": "vote_up"
+  },
+  {
+    "index": "ce15f4273fcdb87ee9d5dbd503e66d5f692c7d9835972111e5af90155da0b4ea_0",
+    "time": 1789430976,
+    "value": "t 0 2 fb17a3f8b350 0 \"Nothing will ever be hidden anymore.\"",
+    "kind": "comment"
+  },
+  {
+    "index": "517a571578e42da1961a12b28eb9803a9a953e37d307d9e777a2e46d189627ba_0",
+    "time": 1789430976,
+    "value": "t 0 2 fb17a3f8b350 0 \"How will you react ?\"",
+    "kind": "comment"
+  },
+  {
+    "index": "e22a6f6f0802ba450e2ae9f53d25dc04d8a3bfbc88b990818f8c63890608b908_0",
+    "time": 1789493786,
+    "value": "t 0 0 \"Everything's matters: Every actions. Every Words.\"",
+    "kind": "message"
+  },
+  {
+    "index": "671cbb15d53431c5fcacfb8ffa7d9328fae6c3c031cf9e2f532399e0af22839b_0",
+    "time": 1789494813,
+    "value": "t 0 2 e22a6f6f0802 0 \"Comments do matters too.\"",
+    "kind": "comment"
+  },
+  {
+    "index": "a3778dc00814be3fe1d2a0365714e8f02b457cbb4acfdfeef2d7ab34a0083eb0_0",
+    "time": 1789496993,
+    "value": "t 0 0 \"You want to remove the Bitcoin immutable book ? Oh Dear. You can't.\"",
+    "kind": "message"
+  },
+  {
+    "index": "c82013608df5ef9b13c3f63b6008cd7f64476c88265cce217b444652b5e6a8f4_0",
+    "time": 1789497189,
+    "value": "t 0 2 a3778dc00814 0 \"And that's exactly the purpose of it.\"",
+    "kind": "comment"
+  },
+  {
+    "index": "f46fb1a1d672a312dddd2874984a76f6616d90e538f9d71297d13a6a1417db45_0",
+    "time": 1789497189,
+    "value": "t 0 2 a3778dc00814 0 \"For everyone to say out loud what is wrong\"",
+    "kind": "comment"
+  },
+  {
+    "index": "64d5c157a9dc53ea854cab0c32f11c64f1113ecda2bbea4c4230fe63fe6b906c_0",
+    "time": 1789497189,
+    "value": "t 0 1 a3778dc00814be3fe1d2a0365714e8f02b457cbb4acfdfeef2d7ab34a0083eb0 0",
+    "kind": "vote_up"
+  },
+  {
+    "index": "a0b78a49fb9574e7efc36ab8b678ae5ed890c3dda8d98fd4046e2c26d42d8df6_0",
+    "time": 1789497189,
+    "value": "t 0 1 a3778dc00814be3fe1d2a0365714e8f02b457cbb4acfdfeef2d7ab34a0083eb0 0",
+    "kind": "vote_up"
+  },
+  {
+    "index": "27e9e74a13dfb025bf6e252175c3aa9e6827e496f859a1a48a9dd479f0e7ad4d_0",
+    "time": 1789497189,
+    "value": "t 0 1 a3778dc00814be3fe1d2a0365714e8f02b457cbb4acfdfeef2d7ab34a0083eb0 0",
+    "kind": "vote_up"
+  },
+  {
+    "index": "d6f7e8cb3afbed79a41a11dd8a4ee288ed5a7414faed2e1d3124bf81fdcd7c26_0",
+    "time": 1789499424,
+    "value": "t 0 0 \"It looks like we can use it as a new Law book. What do you think ?\"",
+    "kind": "message"
+  },
+  {
+    "index": "d57ccbdbf5f87b2f17d473b71a14338703277804511e19da6baeaab67e8a2c81_0",
+    "time": 1789499424,
+    "value": "t 0 2 a3778dc00814 0 \"To express your opinions about the world\"",
+    "kind": "comment"
+  },
+  {
+    "index": "e3438417a38e73bb5c01322334402e96db1d6dbae0ab4a1af814c7cc15d33235_0",
+    "time": 1789499424,
+    "value": "t 0 2 af30257988e2 0 \"Corrupted people? Watch out.\"",
+    "kind": "comment"
+  },
+  {
+    "index": "07a1117605984fc230caf6d215fb5230f675e8af06488894b765a45403982599_0",
+    "time": 1789499424,
+    "value": "t 0 2 d6f7e8cb3afb 0 \"The perfect law book running on consensus.\"",
+    "kind": "comment"
+  },
+  {
+    "index": "8d9434eeebc78d65e9284d96576d9de51a39bf39f4f33b7cbf65732a9322f415_0",
+    "time": 1789499424,
+    "value": "t 0 2 d6f7e8cb3afb 0 \"Is this the Revolution we all waiting for ? Yes.\"",
+    "kind": "comment"
+  },
+  {
+    "index": "3c3ac9c9df64ae8d3df1f837f18dfbc19272a4dcd859fbd97cb8c237ac32b54e_0",
+    "time": 1789499424,
+    "value": "t 0 2 a3778dc00814 0 \"For everyone to say everything in public\"",
+    "kind": "comment"
+  },
+  {
+    "index": "2d44395cb4699399646be1f4d9d03b9856351cad0cc5479a35d60a429c280d32_0",
+    "time": 1789499424,
+    "value": "t 0 0 \"We love you. Forever.\"",
+    "kind": "message"
+  },
+  {
+    "index": "a7272a0e8110e9e2f681b5e29f3bb6430947aa4f32fbc2140eb78db915181d04_0",
+    "time": 1789499424,
+    "value": "t 0 0 \"We will do what's right. Always. theblocknote.eth.link\"",
+    "kind": "message"
+  },
+  {
+    "index": "8a06b4e91ae721029e14e3c38e87f2ab98576d8bbe1f9e929c682d4e1f78db70_0",
+    "time": 1789574634,
+    "value": "t 0 0 \"EU 'opening door' for Canada to become associate member\"",
+    "kind": "message"
+  },
+  {
+    "index": "f1b4e18fcb6a1ba6483055898d3cb788ea21749f32d9b8072315047b4c9b10cd_0",
+    "time": 1789592016,
+    "value": "t 0 2 1edcccb01db5 0 \"Do you understand ?\"",
+    "kind": "comment"
+  },
+  {
+    "index": "129c5eb5152c47a17171cf4d857bc72243ad8dd528374ad5f4c8d467284c388b_0",
+    "time": 1789592016,
+    "value": "t 0 0 \"Everything can be explained. Even. Fear.\"",
+    "kind": "message"
+  },
+  {
+    "index": "76c1710a2241566fe7a58b3e01e2674635986c7b6bc87d4d2d206e1f8aefebd6_0",
+    "time": 1789592016,
+    "value": "t 0 2 129c5eb5152c 0 \"Thank you Macklemore\"",
+    "kind": "comment"
+  },
+  {
+    "index": "1edcccb01db599589cdb705f73f62f39042e7c5ef9a840b9ee080ab49c3549cb_0",
+    "time": 1789592016,
+    "value": "t 0 0 \"We demand one thing: Peace or everything will be reveal\"",
+    "kind": "message"
+  },
+  {
+    "index": "0f5aa8885fcf4775b3a18347212c5a810262fe593707fd798f357a8c7d07c087_0",
+    "time": 1789604561,
+    "value": "t 0 0 \"I don't think you should be afraid of AI.\"",
+    "kind": "message"
+  },
+  {
+    "index": "4772835aa4293b7ddd85db46313fc1e08b60f39ff4e6ec67f0f5adb36591fc48_0",
+    "time": 1789605104,
+    "value": "t 0 2 0f5aa8885fcf 0 \"Bitcoin on the other hand...Probably.\"",
+    "kind": "comment"
+  },
+  {
+    "index": "dc722ff3d9c8b46b3285f871fc2942471f711a2148906ff6674c884a3c1c8981_0",
+    "time": 1789605104,
+    "value": "t 0 1 0f5aa8885fcf4775b3a18347212c5a810262fe593707fd798f357a8c7d07c087 0",
+    "kind": "vote_up"
+  },
+  {
+    "index": "65948ad428c3ba2e9fe199a8e57535c115c5c6986b489bc300b34722b02efeaf_0",
+    "time": 1789731164,
+    "value": "t 0 0 \"We will figure it out. theblocknote.eth.link\"",
+    "kind": "message"
+  },
+  {
+    "index": "c31d87c91d3bb40929f0fa784d3a50691b5fbf81c7d4db4e4c0a9ec38693a91e_0",
+    "time": 1789759369,
+    "value": "t 0 0 \"Algorithms are taking your valuable time from you. Take it back.\"",
+    "kind": "message"
+  },
+  {
+    "index": "7b4e8ca1c6ce04f4ce73c72cff348de34d9cadea203f8b7b95a8823979d8aa3e_0",
+    "time": 1789759369,
+    "value": "t 0 0 \"A puzzle is great but freedom of speech is better my friend\"",
+    "kind": "message"
+  },
+  {
+    "index": "c0a2d421920311b2d239ce6e4b96d5505d4a9b3f1c7f1e8cf46e4e3658add6a5_0",
+    "time": 1789839520,
+    "value": "t 0 0 \"1. Resist. 2. Resist. 3. Resist.\"",
+    "kind": "message"
+  },
+  {
+    "index": "b36a32b85c46f7c4e616f2a669632e98088d6bd8e492a6e005f41db061dce043_0",
+    "time": 1789922936,
+    "value": "t 0 0 \"Oil prices surge as US-Iran strikes intensify in Strait of Hormuz\"",
+    "kind": "message"
+  },
+  {
+    "index": "5bb7a6de3aa72100fad6ee7531fa5aa9038a4ca8a41914933a32f4e31d83c8d0_0",
+    "time": 1789997956,
+    "value": "t 0 0 \"We don't care. We've got Bitcoin: An immutable book.\"",
+    "kind": "message"
+  },
+  {
+    "index": "f301a74097f3cd008d4836417a277ff413e4b666dbf563999cff2a1c40b7cda8_0",
+    "time": 1789998492,
+    "value": "t 0 0 \"Please wake me up when the nightmare is over.\"",
+    "kind": "message"
+  },
+  {
+    "index": "9c74351ea2ef37021b5a58e662583817075b35c0ae78e074e1816cba1357082e_0",
+    "time": 1790001304,
+    "value": "t 0 2 d0140e0abda2 0 \"1. Resist. 2. Resist. 3. Resist.\"",
+    "kind": "comment"
+  },
+  {
+    "index": "d0140e0abda253de3025a8a962e2969775899a406eb8139e2492e087b35eb5ad_0",
+    "time": 1790001304,
+    "value": "t 0 0 \"France: Right to kill? Really? We will stand against it.\"",
+    "kind": "message"
+  },
+  {
+    "index": "2d5840fa7d5d19dccac9fbd44070308377dbc877f4468754d569caa601a48fc3_0",
+    "time": 1790018592,
+    "value": "t 0 0 \"We cannot control the world, but we can greatly influence it.\"",
+    "kind": "message"
+  },
+  {
+    "index": "bb0fe12b0a580919f15b46c88cff6f911c44f45378bfdb99a76c4b8c611e9b66_0",
+    "time": 1790019206,
+    "value": "t 0 0 \"Singularity has been signed off in 2009.\"",
+    "kind": "message"
+  },
+  {
+    "index": "ffc4f722af606a52d38e031be44da058783c136ab1005fbc0c97afd7b8afad7d_0",
+    "time": 1790019206,
+    "value": "t 0 0 \"This book might be so little to what actually exist in the universe\"",
+    "kind": "message"
+  },
+  {
+    "index": "0f6ede3637eb8304c92c84c1e474b713cc2d67319a978676561f5564d98a1267_0",
+    "time": 1790024391,
+    "value": "t 0 2 ee7c790c7e07 0 \"Nothing much in 2026 than in 2025. Apparently.\"",
+    "kind": "comment"
+  },
+  {
+    "index": "688d82a86e8f067a5b16bbf2e350a3d031ce1a2cfff2315dacd0885ce553c996_0",
+    "time": 1790086695,
+    "value": "t 0 0 \"Question everything or shut up and be a victim of authority.\"",
+    "kind": "message"
+  },
+  {
+    "index": "ee51072c68734674dcfba31026df29425556bb1183602976c6d246bcc0f6b70a_0",
+    "time": 1790197460,
+    "value": "t 0 2 f8a5a33b4f97 0 \"Emmanuel Macron was right. They don't care now.\"",
+    "kind": "comment"
+  },
+  {
+    "index": "4500fa112fe8632b2a67e680d39943b5b3c923ddad649c4d3e0d819f8e17ad38_0",
+    "time": 1790274604,
+    "value": "t 0 0 \"Hi Valen\"",
+    "kind": "message"
+  },
+  {
+    "index": "86bd5dbcd6f1d9435bb412b5ea0fb4c9f4059740868a7b36727c90f7e9816f4c_0",
+    "time": 1790370293,
+    "value": "t 0 0 \"Use theblocknote.eth.link to communicate from now on\"",
+    "kind": "message"
+  },
+  {
+    "index": "cdfce4d6257d4b0b3f0e30b5402d6ee228afb8b05be00213aaefeff18828bf38_0",
+    "time": 1791937884,
+    "value": "t 0 0 \"French student protests heat up as budget battle looms\""
+  },
+  {
+    "index": "daa4644a73e9eb0e439ec7d5fc6e72d20643bbf9376fdf8de134627df1418b4f_0",
+    "time": 1791940484,
+    "value": "t 0 0 \"Looking forward for 17 October it seems a Revolution is coming?\""
+  },
+  {
+    "index": "d7967b9235ef08b2dd062c6d3e624118c9ada7c9f73de343a9a4ced9107d28f2_0",
+    "time": 1791941190,
+    "value": "t 0 0 \"Peaceful Protest is the way to go. Spread your voice and vote.\""
+  },
+  {
+    "index": "75c633b3eb6ff709de4495d2b8cf8287be8382d8a1447c88536b59672090e106_0",
+    "time": 1791943021,
+    "value": "t 0 0 \"France will show you how to make a Revolution\""
+  },
+  {
+    "index": "dcae851ea2e9169d870a5d71f59439d7830509d8b03f64fac5f0e360debfeb2d_0",
+    "time": 1791943053,
+    "value": "t 0 1 75c633b3eb6ff709de4495d2b8cf8287be8382d8a1447c88536b59672090e106 0"
+  },
+  {
+    "index": "38e5fafdff4a9d951a8f6cadfe157892970a94afa7fd41ba9097014b77039334_0",
+    "time": 1791944041,
+    "value": "t 0 2 02da47fdd30e 0 \"It has never been so true. #FrenchRevolution\""
   }
 ]

@@ -4,7 +4,7 @@ import React from 'react'
 export default function BitcoinBackgroundMark({ opacity = 0.2 }) {
   return (
     <div
-      className="pointer-events-none absolute inset-0 z-0 overflow-hidden"
+      className="bitcoin-background-mark pointer-events-none absolute inset-0 z-0 overflow-hidden"
       aria-hidden="true"
     >
       <svg

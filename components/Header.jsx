@@ -128,6 +128,13 @@ export default function Header() {
                 >
                   <span className="font-medium">{t('nav.live')}</span>
                 </NavLink>
+                <NavLink
+                  to="/map"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={navClass}
+                >
+                  <span className="font-medium">{t('nav.map')}</span>
+                </NavLink>
                 <Link
                   to="https://bitcoin.org/bitcoin.pdf"
                   target="_blank"

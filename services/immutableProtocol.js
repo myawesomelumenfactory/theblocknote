@@ -187,6 +187,41 @@ export function parsePulseVoteValue(value) {
   }
 }
 
+/** Protocol type for world map country upvotes. */
+export const COUNTRY_VOTE_TYPE = '7'
+
+/**
+ * ISO 3166-1 numeric (3 digits), or X + 2 letters for places without an ISO
+ * numeric code in the world atlas (e.g. XKX = Kosovo).
+ */
+export const COUNTRY_CODE_RE = /^(\d{3}|X[A-Z]{2})$/
+
+/**
+ * Country upvote OP_RETURN:
+ *   t 0 7 <countryCode>
+ *
+ * Each confirmed line is one upvote for that country.
+ */
+export function encodeCountryVote(countryCode) {
+  const code = String(countryCode || '').trim().toUpperCase()
+  if (!COUNTRY_CODE_RE.test(code)) {
+    throw new Error('Invalid country code')
+  }
+  return `t 0 ${COUNTRY_VOTE_TYPE} ${code}`
+}
+
+export function parseCountryVoteValue(value) {
+  const parts = tokenizeProtocolValue(value)
+  if (!parts || parts.length < 4) return null
+  if (parts[0] !== 't') return null
+  if (String(parts[2]) !== COUNTRY_VOTE_TYPE) return null
+
+  const code = String(parts[3] || '').trim().toUpperCase()
+  if (!COUNTRY_CODE_RE.test(code)) return null
+
+  return { kind: 'country_vote', code }
+}
+
 /**
  * Classify a stored protocol value for indexers / UI reconstruction.
  */
@@ -210,6 +245,9 @@ export function parseProtocolValue(value) {
   }
   if (type === PULSE_VOTE_TYPE) {
     return parsePulseVoteValue(value)
+  }
+  if (type === COUNTRY_VOTE_TYPE) {
+    return parseCountryVoteValue(value)
   }
   return { kind: 'other', type, parts }
 }

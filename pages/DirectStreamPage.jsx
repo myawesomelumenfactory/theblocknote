@@ -116,7 +116,7 @@ export default function DirectStreamPage() {
 
         <div
           className="relative overflow-hidden rounded-2xl border border-red-500/30 bg-black"
-          style={{ height: 'min(78vh, 720px)' }}
+          style={{ height: 'min(calc(78vh / var(--app-zoom, 1)), 720px)' }}
         >
           {status === 'loading' ? (
             <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-black/80 text-white/70">
