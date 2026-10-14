@@ -23,7 +23,7 @@ import {
 import immutablesData, { immutablesState } from 'virtual:immutables'
 import { SharedContext } from '../src/SharedContext'
 import { useLanguage } from '../src/i18n/LanguageContext'
-import { applyComment, applyVoteDown, applyVoteUp, getHighestFundedUnit, sendBitcoinTransaction, validateUTXO } from '../services/BitcoinService'
+import { applyComment, getHighestFundedUnit, sendBitcoinTransaction, validateUTXO } from '../services/BitcoinService'
 import { appendImmutable, loadImmutableRecords, subscribeImmutables } from '../services/ImmutablesStore'
 import { COMMENT_TEXT_MAX, MESSAGE_TEXT_MAX, encodeMessage } from '../services/immutableProtocol'
 import {
@@ -39,11 +39,13 @@ import {
   DECLARATION_REPLY_MAX,
   fetchDeclarationReactions,
   fetchDeclarations,
+  fetchMessageVotes,
   postDeclaration,
   replyToDeclaration,
   resolveDeclarationStatuses,
   shortNpub,
   voteDeclaration,
+  voteMessage,
 } from '../services/declarations'
 import { DECLARATION_MAX } from '../services/declarationCore'
 import { gatewayUrl } from '../services/ipfs'
@@ -221,16 +223,14 @@ function PostItem({ post, t, locale, myVote, canAct, busy, open, onToggle, onVot
                     key={direction}
                     type="button"
                     onClick={() => onVote(direction)}
-                    disabled={Boolean(myVote) || !canAct || Boolean(busy)}
+                    disabled={Boolean(myVote) || Boolean(busy)}
                     aria-pressed={chosen}
                     title={
                       myVote
-                        ? declaration && chosen && voteStatus !== undefined
+                        ? chosen && voteStatus !== undefined
                           ? voteStatusTitle(voteStatus, t, locale)
                           : t('timeline.alreadyVoted')
-                        : !canAct
-                          ? t('timeline.needUnit')
-                          : t(`timeline.${direction === 'up' ? 'voteUp' : 'voteDown'}${declaration ? 'Free' : 'Chain'}`)
+                        : t(`timeline.${direction === 'up' ? 'voteUpFree' : 'voteDownFree'}`)
                     }
                     className={`inline-flex items-center gap-1 rounded-full px-2 py-1 ${
                       chosen ? `${color} cursor-default` : `${hover} disabled:opacity-50 disabled:hover:text-inherit`
@@ -367,6 +367,7 @@ export default function Timeline() {
   const [declarations, setDeclarations] = useState([])
   const [declStatuses, setDeclStatuses] = useState(new Map())
   const [declReactions, setDeclReactions] = useState(new Map())
+  const [messageVotes, setMessageVotes] = useState(new Map())
   const [replyStatuses, setReplyStatuses] = useState(new Map())
   const [voteStatuses, setVoteStatuses] = useState(new Map())
 
@@ -405,13 +406,33 @@ export default function Timeline() {
   const canAct = Boolean(unit)
   const freeIdentity = useMemo(() => getFreeNoteIdentity(), [])
 
+  const chainPosts = useMemo(() => buildTimeline(records), [records])
+  const chainKey = chainPosts.map((p) => p.index).join(',')
+  useEffect(() => {
+    if (!chainKey) return
+    let cancelled = false
+    fetchMessageVotes(chainKey.split(','))
+      .then((votes) => {
+        if (!cancelled) setMessageVotes(votes)
+      })
+      .catch((err) => console.warn('Message votes failed to load', err))
+    return () => {
+      cancelled = true
+    }
+  }, [chainKey])
+
   const posts = useMemo(() => {
-    const chain = buildTimeline(records).map((p) => ({
-      ...p,
-      kind: 'chain',
-      seed: p.txid,
-      handle: `@${p.txid.slice(0, 8)}`,
-    }))
+    const chain = chainPosts.map((p) => {
+      const free = messageVotes.get(p.index)
+      return {
+        ...p,
+        kind: 'chain',
+        seed: p.txid,
+        handle: `@${p.txid.slice(0, 8)}`,
+        ups: p.ups + (free?.ups.size || 0),
+        downs: p.downs + (free?.downs.size || 0),
+      }
+    })
     const declared = declarations.map((d) => {
       const reactions = declReactions.get(d.eventId)
       return {
@@ -441,7 +462,7 @@ export default function Timeline() {
       }
     })
     return [...chain, ...declared].sort((a, b) => b.time - a.time)
-  }, [records, declarations, declReactions])
+  }, [chainPosts, messageVotes, declarations, declReactions])
   const trending = useMemo(() => buildTrending(posts), [posts])
   const categoryCounts = useMemo(() => {
     const counts = new Map()
@@ -550,12 +571,14 @@ export default function Timeline() {
       return next
     })
 
+  /** Free anchored votes on a post: declarations by event id, on-chain messages by `txid_vout`. */
+  const freeVotesOn = (post) =>
+    post.kind === 'declaration' ? declReactions.get(post.eventId) : messageVotes.get(post.index)
+
   const myVoteOn = (post) => {
-    if (post.kind === 'declaration') {
-      const reactions = declReactions.get(post.eventId)
-      if (reactions?.ups.has(freeIdentity.pubkey)) return 'up'
-      if (reactions?.downs.has(freeIdentity.pubkey)) return 'down'
-    }
+    const reactions = freeVotesOn(post)
+    if (reactions?.ups.has(freeIdentity.pubkey)) return 'up'
+    if (reactions?.downs.has(freeIdentity.pubkey)) return 'down'
     return myVotes[post.index] || null
   }
 
@@ -564,43 +587,24 @@ export default function Timeline() {
     if (myVoteOn(post) || busy[post.index]) return
     setPostBusy(post.index, `vote-${direction}`)
     setNotice(null)
-    if (post.kind === 'declaration') {
-      try {
-        const vote = await voteDeclaration(post, direction)
-        rememberVote(post.index, direction)
-        setDeclReactions((prev) => {
-          const next = new Map(prev)
-          const entry = next.get(post.eventId) || { ups: new Set(), downs: new Set(), votes: new Map(), replies: [] }
-          const field = direction === 'up' ? 'ups' : 'downs'
-          next.set(post.eventId, {
-            ...entry,
-            [field]: new Set(entry[field]).add(freeIdentity.pubkey),
-            votes: new Map(entry.votes).set(freeIdentity.pubkey, vote),
-          })
-          return next
-        })
-        setVoteStatuses((prev) => new Map(prev).set(vote.eventId, { status: 'pending' }))
-      } catch (err) {
-        setNotice({ type: 'error', text: err.message || t('timeline.voteFailed') })
-      } finally {
-        setPostBusy(post.index, null)
-      }
-      return
-    }
+    const declaration = post.kind === 'declaration'
+    const key = declaration ? post.eventId : post.index
     try {
-      const { selected, utxo } = await spendUnit()
-      const [hash, vout] = post.index.split('_')
-      const apply = direction === 'up' ? applyVoteUp : applyVoteDown
-      const result = await apply(utxo, hash, vout, FEE)
-      if (!result.success) throw new Error(result.error || t('timeline.voteFailed'))
-      await appendImmutable({
-        index: `${result.transactionId}_0`,
-        time: Math.floor(Date.now() / 1000),
-        value: `t 0 ${direction === 'up' ? '1' : '-1'} ${hash} ${vout}`,
-        unconfirmed: true,
-      })
+      const vote = declaration ? await voteDeclaration(post, direction) : await voteMessage(post.index, direction)
       rememberVote(post.index, direction)
-      await finish(selected, result, t(direction === 'up' ? 'timeline.votedUp' : 'timeline.votedDown'))
+      const setVotes = declaration ? setDeclReactions : setMessageVotes
+      setVotes((prev) => {
+        const next = new Map(prev)
+        const entry = next.get(key) || { ups: new Set(), downs: new Set(), votes: new Map(), replies: [] }
+        const field = direction === 'up' ? 'ups' : 'downs'
+        next.set(key, {
+          ...entry,
+          [field]: new Set(entry[field]).add(freeIdentity.pubkey),
+          votes: new Map(entry.votes).set(freeIdentity.pubkey, vote),
+        })
+        return next
+      })
+      setVoteStatuses((prev) => new Map(prev).set(vote.eventId, { status: 'pending' }))
     } catch (err) {
       setNotice({ type: 'error', text: err.message || t('timeline.voteFailed') })
     } finally {
@@ -676,7 +680,7 @@ export default function Timeline() {
   const requestedVoteStatuses = useRef(new Set())
   useEffect(() => {
     const due = []
-    for (const entry of declReactions.values()) {
+    for (const entry of [...declReactions.values(), ...messageVotes.values()]) {
       const mine = entry.votes?.get(freeIdentity.pubkey)
       if (!mine?.anchored || requestedVoteStatuses.current.has(mine.eventId)) continue
       requestedVoteStatuses.current.add(mine.eventId)
@@ -690,11 +694,10 @@ export default function Timeline() {
         return next
       }),
     )
-  }, [declReactions, freeIdentity])
+  }, [declReactions, messageVotes, freeIdentity])
 
   const myVoteStatus = (post) => {
-    if (post.kind !== 'declaration') return undefined
-    const mine = declReactions.get(post.eventId)?.votes?.get(freeIdentity.pubkey)
+    const mine = freeVotesOn(post)?.votes?.get(freeIdentity.pubkey)
     if (!mine) return undefined
     if (!mine.anchored) return { status: 'none' }
     return voteStatuses.get(mine.eventId) || null

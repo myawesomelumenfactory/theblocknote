@@ -12,13 +12,17 @@ import {
 import {
   DECLARATION_MAX,
   DECLARATION_TAG,
+  KIND_EVENT_REACTION,
+  KIND_EXTERNAL_REACTION,
   REPLY_TAG,
   VOTE_TAG,
   fingerprintText,
+  messageVoteTags,
   replyRoot,
   validateDeclarationEvent,
   validateReplyEvent,
   validateVoteEvent,
+  voteTarget,
   voteText,
 } from './declarationCore'
 import { fetchTextByCid } from './ipfs'
@@ -27,7 +31,6 @@ import { FREE_NOTE_RELAYS, getFreeNoteIdentity } from './freeNotes'
 export const DECLARATION_REPLY_MAX = 280
 
 const KIND_NOTE = 1
-const KIND_REACTION = 7
 
 const PROOFS_STORAGE = 'theblocknote:declarations:proofs'
 const VERIFIED_STORAGE = 'theblocknote:declarations:verified'
@@ -267,48 +270,19 @@ export async function fetchDeclarationReactions(eventIds) {
   if (eventIds.length === 0) return reactions
   const [events, archivedVotes] = await Promise.all([
     getPool()
-      .querySync(FREE_NOTE_RELAYS, { kinds: [KIND_REACTION, KIND_NOTE], '#e': eventIds }, { maxWait: 4000 })
+      .querySync(FREE_NOTE_RELAYS, { kinds: [KIND_EVENT_REACTION, KIND_NOTE], '#e': eventIds }, { maxWait: 4000 })
       .catch(() => []),
     loadArchive('votes'),
   ])
 
-  const seen = new Set()
-  const keepLatest = (vote) => {
-    const entry = reactions.get(vote.target)
-    if (!entry) return
-    const previous = entry.votes.get(vote.pubkey)
-    if (!previous || vote.time > previous.time) entry.votes.set(vote.pubkey, vote)
-  }
-  for (const row of archivedVotes) {
-    if (!row?.eventId || !row.target || !row.digest) continue
-    seen.add(row.eventId)
-    keepLatest({
-      eventId: row.eventId,
-      target: row.target,
-      pubkey: row.pubkey,
-      time: row.created_at,
-      up: row.direction !== 'down',
-      anchored: true,
-      cid: row.cid,
-      digestHex: row.digest,
-      proofs: row.ots ? [row.ots] : [],
-      anchor: row.anchor || null,
-    })
-  }
-
+  const seen = await collectVotes(reactions, events, archivedVotes)
   for (const event of events) {
-    if (seen.has(event.id)) continue
+    if (seen.has(event.id) || event.kind !== KIND_NOTE) continue
     seen.add(event.id)
-    const root = replyRoot(event)
-    const target = reactions.get(root)
-    if (!target) continue
-    if (event.kind === KIND_REACTION) {
-      const vote = await toVote(event, root)
-      if (vote) keepLatest(vote)
-    } else if (event.kind === KIND_NOTE && event.content && verifyEvent(event)) {
-      const reply = await toReply(event)
-      if (reply) target.replies.push(reply)
-    }
+    const target = reactions.get(replyRoot(event))
+    if (!target || !event.content || !verifyEvent(event)) continue
+    const reply = await toReply(event)
+    if (reply) target.replies.push(reply)
   }
   const texts = readJson(TEXT_CACHE_STORAGE)
   const archived = (await loadArchive('replies')).filter(
@@ -340,11 +314,75 @@ export async function fetchDeclarationReactions(eventIds) {
     }),
   )
 
-  for (const entry of reactions.values()) {
-    for (const vote of entry.votes.values()) (vote.up ? entry.ups : entry.downs).add(vote.pubkey)
-    entry.replies.sort((a, b) => a.time - b.time)
-  }
+  for (const entry of reactions.values()) entry.replies.sort((a, b) => a.time - b.time)
   return reactions
+}
+
+/**
+ * Free anchored votes on on-chain messages (kind 17 reactions to `bitcoin:tx:<txid>`),
+ * from relays and from the pinned archive. Each key counts once per message.
+ * @param {string[]} indices on-chain message ids (`txid_vout`)
+ * @returns {Promise<Map<string, { ups: Set<string>, downs: Set<string>, votes: Map<string, object> }>>}
+ */
+export async function fetchMessageVotes(indices) {
+  const entries = new Map(indices.map((index) => [index, { ups: new Set(), downs: new Set(), votes: new Map() }]))
+  if (indices.length === 0) return entries
+  const txids = [...new Set(indices.map((index) => index.split('_')[0]))]
+  const [events, archivedVotes] = await Promise.all([
+    getPool()
+      .querySync(
+        FREE_NOTE_RELAYS,
+        { kinds: [KIND_EXTERNAL_REACTION], '#i': txids.map((txid) => `bitcoin:tx:${txid}`) },
+        { maxWait: 4000 },
+      )
+      .catch(() => []),
+    loadArchive('votes'),
+  ])
+  await collectVotes(entries, events, archivedVotes)
+  return entries
+}
+
+/**
+ * Fill `entries` (keyed by vote target) with archived and relay votes, keeping each
+ * key's latest vote, then derive the `ups` / `downs` sets.
+ * @returns {Promise<Set<string>>} ids of the events already handled
+ */
+async function collectVotes(entries, events, archivedVotes) {
+  const seen = new Set()
+  const keepLatest = (vote) => {
+    const entry = entries.get(vote.target)
+    if (!entry) return
+    const previous = entry.votes.get(vote.pubkey)
+    if (!previous || vote.time > previous.time) entry.votes.set(vote.pubkey, vote)
+  }
+  for (const row of archivedVotes) {
+    if (!row?.eventId || !row.target || !row.digest) continue
+    seen.add(row.eventId)
+    keepLatest({
+      eventId: row.eventId,
+      target: row.target,
+      pubkey: row.pubkey,
+      time: row.created_at,
+      up: row.direction !== 'down',
+      anchored: true,
+      cid: row.cid,
+      digestHex: row.digest,
+      proofs: row.ots ? [row.ots] : [],
+      anchor: row.anchor || null,
+    })
+  }
+  for (const event of events) {
+    if (seen.has(event.id) || (event.kind !== KIND_EVENT_REACTION && event.kind !== KIND_EXTERNAL_REACTION)) continue
+    seen.add(event.id)
+    const target = voteTarget(event)
+    if (!entries.has(target)) continue
+    const vote = await toVote(event, target)
+    if (vote) keepLatest(vote)
+  }
+  for (const entry of entries.values()) {
+    for (const vote of entry.votes.values()) (vote.up ? entry.ups : entry.downs).add(vote.pubkey)
+  }
+  return seen
 }
 
 /**
@@ -392,20 +430,42 @@ async function toReply(event) {
  * and anchored in Bitcoin.
  * @param {'up' | 'down'} direction
  */
-export async function voteDeclaration(decl, direction, onStep) {
-  const { pubkey } = getFreeNoteIdentity()
-  const time = Math.floor(Date.now() / 1000)
-  const { event, cid, digestHex, proof } = await stampAndPublish(
+export function voteDeclaration(decl, direction, onStep) {
+  return castVote(
     {
-      kind: KIND_REACTION,
-      content: direction === 'down' ? '-' : '+',
-      fingerprint: voteText({ direction, target: decl.eventId, pubkey, time }),
-      topic: VOTE_TAG,
+      kind: KIND_EVENT_REACTION,
+      target: decl.eventId,
       tags: [
         ['e', decl.eventId, FREE_NOTE_RELAYS[0]],
         ['p', decl.pubkey],
         ['k', String(KIND_NOTE)],
       ],
+    },
+    direction,
+    onStep,
+  )
+}
+
+/**
+ * Vote on an on-chain message for free: a Nostr reaction to its Bitcoin transaction,
+ * stamped and anchored in Bitcoin like declaration votes.
+ * @param {string} index on-chain message id (`txid_vout`)
+ * @param {'up' | 'down'} direction
+ */
+export function voteMessage(index, direction, onStep) {
+  return castVote({ kind: KIND_EXTERNAL_REACTION, target: index, tags: messageVoteTags(index) }, direction, onStep)
+}
+
+async function castVote({ kind, target, tags }, direction, onStep) {
+  const { pubkey } = getFreeNoteIdentity()
+  const time = Math.floor(Date.now() / 1000)
+  const { event, cid, digestHex, proof } = await stampAndPublish(
+    {
+      kind,
+      content: direction === 'down' ? '-' : '+',
+      fingerprint: voteText({ direction, target, pubkey, time }),
+      topic: VOTE_TAG,
+      tags,
       alt: `The Block Note vote ${direction === 'down' ? '-1' : '+1'} anchored in Bitcoin through OpenTimestamps`,
       createdAt: time,
     },
@@ -413,7 +473,7 @@ export async function voteDeclaration(decl, direction, onStep) {
   )
   return {
     eventId: event.id,
-    target: decl.eventId,
+    target,
     pubkey,
     time,
     up: direction !== 'down',
