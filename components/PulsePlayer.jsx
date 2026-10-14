@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ExternalLink, Pause, Play } from 'lucide-react'
+import { pageZoom } from '../services/pageZoom'
 
 function formatTime(seconds) {
   if (!Number.isFinite(seconds) || seconds < 0) return '0:00'
@@ -99,7 +100,7 @@ export default function PulsePlayer({
     const bar = barRef.current
     if (!audio || !bar || !Number.isFinite(audio.duration) || audio.duration <= 0) return
     const rect = bar.getBoundingClientRect()
-    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width))
+    const ratio = Math.min(1, Math.max(0, (clientX / pageZoom() - rect.left) / rect.width))
     const next = ratio * audio.duration
     audio.currentTime = next
     setCurrent(next)

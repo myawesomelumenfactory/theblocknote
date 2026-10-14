@@ -9,7 +9,7 @@
       (function () {
         try {
           var theme = localStorage.getItem('theblocknote.theme');
-          if (theme !== 'bitcoin-orange' && theme !== 'deep-ledger') theme = 'bitcoin-orange';
+          if (theme !== 'bitcoin-orange' && theme !== 'deep-ledger' && theme !== 'timeline') theme = 'bitcoin-orange';
           document.documentElement.setAttribute('data-theme', theme);
         } catch (e) {
           document.documentElement.setAttribute('data-theme', 'bitcoin-orange');

@@ -19,6 +19,7 @@ import {
 import immutablesData, { immutablesState } from 'virtual:immutables'
 import { useLanguage } from '../src/i18n/LanguageContext'
 import { useTheme } from '../src/theme/ThemeContext'
+import { pointerOffset } from '../services/pageZoom'
 
 const FEE = 450
 
@@ -113,9 +114,9 @@ export default function MapPage() {
     })
 
   const handleMouseMove = useCallback((event) => {
-    const rect = mapRef.current?.getBoundingClientRect()
-    if (!rect) return
-    setTooltipPos({ x: event.clientX - rect.left, y: event.clientY - rect.top })
+    if (!mapRef.current) return
+    const { x, y } = pointerOffset(event, mapRef.current)
+    setTooltipPos({ x, y })
   }, [])
 
   const castVote = useCallback(
