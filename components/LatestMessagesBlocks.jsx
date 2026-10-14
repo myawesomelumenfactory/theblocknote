@@ -4,7 +4,10 @@ import GlassCard from "./GlassCard";
 import TranslateButton from "./TranslateButton";
 import { decodeOpReturn } from '../services/TheBlockNote';
 import { Activity, ChevronUp, ChevronDown, Clock, List, Loader2, MessageCircle } from "lucide-react";
-import { applyVoteUp, applyVoteDown, applyComment, getHighestFundedUnit } from '../services/BitcoinService';
+import { applyComment, getHighestFundedUnit } from '../services/BitcoinService';
+import { fetchMessageVotes, shortNpub, voteMessage } from '../services/declarations';
+import { getFreeNoteIdentity } from '../services/freeNotes';
+import { gatewayUrl } from '../services/ipfs';
 import { appendImmutable, loadImmutableRecords } from '../services/ImmutablesStore';
 import {
   COMMENT_TEXT_MAX,
@@ -23,6 +26,8 @@ export default function LatestMessagesBlocks() {
   const [messages, setMessages] = useState([]);
   const [opReturns, setOpReturns] = useState([]);
   const [theblocknote, setTheBlockNote] = useState([]);
+  const [freeVotes, setFreeVotes] = useState(() => new Map());
+  const freeIdentity = useMemo(() => getFreeNoteIdentity(), []);
   const [txids, setTxids] = useState([]);
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
   const [voteNotice, setVoteNotice] = useState(null);
@@ -83,63 +88,32 @@ export default function LatestMessagesBlocks() {
     });
   }
 
-  const handleVote = async (messageIndex, direction) => {
-    const selectedUnit = getHighestFundedUnit(Array.isArray(refs) ? refs : [], 450);
-    if (!selectedUnit) {
-      setVoteNotice({ type: 'error', text: t('messages.voteBefore') });
-      return;
-    }
+  const hasFreeVote = (messageIndex) => Boolean(freeVotes.get(messageIndex)?.votes.has(freeIdentity.pubkey));
 
+  const handleVote = async (messageIndex, direction) => {
+    if (hasFreeVote(messageIndex)) return;
     setVotingIndex(messageIndex);
     setVoteNotice(null);
 
     try {
-      const parts = messageIndex.split('_');
-      const hash = parts[0];
-      const vout = parts[1];
-      const utxo = ensureUtxoHex ? await ensureUtxoHex(selectedUnit.index) : selectedUnit;
-      const result = direction === 'up'
-        ? await applyVoteUp(utxo, hash, vout, 450)
-        : await applyVoteDown(utxo, hash, vout, 450);
-
-      if (!result.success) {
-        setVoteNotice({ type: 'error', text: result.error || t('messages.voteFailed') });
-        return;
-      }
-
-      await appendImmutable({
-        index: `${result.transactionId}_0`,
-        time: Math.floor(Date.now() / 1000),
-        value: direction === 'up' ? `t 0 1 ${hash} ${vout}` : `t 0 -1 ${hash} ${vout}`,
+      const vote = await voteMessage(messageIndex, direction);
+      setFreeVotes((prev) => {
+        const next = new Map(prev);
+        const entry = next.get(messageIndex) || { ups: new Set(), downs: new Set(), votes: new Map() };
+        const field = direction === 'up' ? 'ups' : 'downs';
+        next.set(messageIndex, {
+          ...entry,
+          [field]: new Set(entry[field]).add(freeIdentity.pubkey),
+          votes: new Map(entry.votes).set(freeIdentity.pubkey, vote),
+        });
+        return next;
       });
-
-      const newVote = {
-        txid: result.transactionId,
-        time: Math.floor(Date.now() / 1000),
-        direction,
-      };
-
-      setTheBlockNote((prev) =>
-        prev.map((msg) =>
-          msg.index === messageIndex
-            ? {
-                ...msg,
-                ups: direction === 'up' ? msg.ups + 1 : msg.ups,
-                downs: direction === 'down' ? msg.downs + 1 : msg.downs,
-                votes: [...(msg.votes || []), newVote],
-              }
-            : msg
-        )
-      );
       setOpenVoteLists((prev) => new Set([...prev, messageIndex]));
       setVoteNotice({
         type: 'success',
         text: direction === 'up' ? t('messages.upRecorded') : t('messages.downRecorded'),
-        url: result.explorerUrl,
+        url: gatewayUrl(vote.cid),
       });
-      if (refreshRefs) {
-        await refreshRefs({ watch: true, address: selectedUnit.public_key });
-      }
     } catch (error) {
       setVoteNotice({ type: 'error', text: error.message || t('messages.voteFailed') });
     } finally {
@@ -523,8 +497,44 @@ export default function LatestMessagesBlocks() {
     };
   }, []);
 
+  const messageKey = theblocknote.map((m) => m.index).filter(Boolean).join(',');
+  useEffect(() => {
+    if (!messageKey) return undefined;
+    let cancelled = false;
+    fetchMessageVotes(messageKey.split(','))
+      .then((votes) => {
+        if (!cancelled) setFreeVotes(votes);
+      })
+      .catch((error) => console.warn('Free votes failed to load', error));
+    return () => {
+      cancelled = true;
+    };
+  }, [messageKey]);
+
+  const withFreeVotes = useMemo(
+    () =>
+      theblocknote.map((msg) => {
+        const free = freeVotes.get(msg.index);
+        if (!free || free.votes.size === 0) return msg;
+        const freeList = [...free.votes.values()].map((vote) => ({
+          free: true,
+          cid: vote.cid,
+          pubkey: vote.pubkey,
+          time: vote.time,
+          direction: vote.up ? 'up' : 'down',
+        }));
+        return {
+          ...msg,
+          ups: msg.ups + free.ups.size,
+          downs: msg.downs + free.downs.size,
+          votes: [...(msg.votes || []), ...freeList].sort((a, b) => b.time - a.time),
+        };
+      }),
+    [theblocknote, freeVotes]
+  );
+
   const visibleMessages = useMemo(() => {
-    const rows = [...theblocknote];
+    const rows = [...withFreeVotes];
     if (sortMode === 'up') {
       rows.sort((a, b) => b.ups - a.ups || b.time - a.time);
       return rows;
@@ -536,7 +546,7 @@ export default function LatestMessagesBlocks() {
     }
     rows.sort((a, b) => b.time - a.time);
     return rows;
-  }, [theblocknote, sortMode]);
+  }, [withFreeVotes, sortMode]);
 
   useEffect(() => {
     setVisibleCount(BATCH_SIZE);
@@ -691,6 +701,7 @@ export default function LatestMessagesBlocks() {
         {shownMessages.map((msg, index) => {
           const txid = voteTxidFromIndex(msg.index);
           const txUrl = explorerTxUrl(txid);
+          const voteLocked = votingIndex === msg.index || hasFreeVote(msg.index);
           return (
           <motion.div 
             {...windowMotion({
@@ -742,11 +753,11 @@ export default function LatestMessagesBlocks() {
                 <button
                   type="button"
                   onClick={() => handleVoteUp(msg.index)}
-                  disabled={!hasFundedUnit || votingIndex === msg.index}
-                  title={!hasFundedUnit ? t('messages.loadToVote') : t('messages.voteUp')}
+                  disabled={voteLocked}
+                  title={hasFreeVote(msg.index) ? t('messages.alreadyVoted') : t('messages.voteUp')}
                   className={`
                     messages-vote-btn flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200 border border-transparent
-                    ${!hasFundedUnit || votingIndex === msg.index
+                    ${voteLocked
                       ? 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
                       : 'bg-white/10 text-white hover:bg-green-500/20 hover:text-green-400 hover:scale-105'
                     }
@@ -760,11 +771,11 @@ export default function LatestMessagesBlocks() {
                 <button
                   type="button"
                   onClick={() => handleVoteDown(msg.index)}
-                  disabled={!hasFundedUnit || votingIndex === msg.index}
-                  title={!hasFundedUnit ? t('messages.loadToVote') : t('messages.voteDown')}
+                  disabled={voteLocked}
+                  title={hasFreeVote(msg.index) ? t('messages.alreadyVoted') : t('messages.voteDown')}
                   className={`
                     messages-vote-btn flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200 border border-transparent
-                    ${!hasFundedUnit || votingIndex === msg.index
+                    ${voteLocked
                       ? 'bg-gray-500/20 text-gray-500 cursor-not-allowed'
                       : 'bg-white/10 text-white hover:bg-red-500/20 hover:text-red-400 hover:scale-105'
                     }
@@ -817,22 +828,23 @@ export default function LatestMessagesBlocks() {
                     ) : (
                       (msg.votes || []).map((vote) => (
                         <li
-                          key={`${vote.txid}-${vote.direction}-${vote.time}`}
+                          key={`${vote.txid || vote.cid}-${vote.direction}-${vote.time}`}
                           className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2"
                         >
                           <div className="flex items-center justify-between gap-3 mb-1">
                             <span className={`text-xs font-medium ${vote.direction === 'up' ? 'text-green-400' : 'text-red-400'}`}>
                               {vote.direction === 'up' ? t('messages.upVote') : t('messages.downVote')}
+                              {vote.free ? ` · ${t('messages.freeVote', { handle: shortNpub(vote.pubkey) })}` : ''}
                             </span>
                             <span className="text-white/40 text-xs">{formatTimestampToUTC(vote.time)}</span>
                           </div>
                           <a
-                            href={explorerTxUrl(vote.txid)}
+                            href={vote.free ? gatewayUrl(vote.cid) : explorerTxUrl(vote.txid)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="font-mono text-xs text-white/80 hover:text-white break-all underline decoration-white/20 hover:decoration-white/60"
                           >
-                            {vote.txid}
+                            {vote.free ? vote.cid : vote.txid}
                           </a>
                         </li>
                       ))

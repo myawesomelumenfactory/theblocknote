@@ -1,9 +1,12 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import WebSocket from 'ws'
 import { verifyEvent } from 'nostr-tools/pure'
-import { SimplePool } from 'nostr-tools/pool'
+import { SimplePool, useWebSocketImplementation } from 'nostr-tools/pool'
 import {
   DECLARATION_TAG,
+  KIND_EVENT_REACTION,
+  KIND_EXTERNAL_REACTION,
   MAP_VOTE_TAG,
   REPLY_TAG,
   VOTE_TAG,
@@ -26,7 +29,13 @@ const COLLECTIONS = [
   { label: 'Declarations', file: 'declarations.json', tag: DECLARATION_TAG, validate: validateDeclarationEvent },
   { label: 'Map votes', file: 'map-votes.json', tag: MAP_VOTE_TAG, validate: validateMapVoteEvent },
   { label: 'Replies', file: 'replies.json', tag: REPLY_TAG, validate: validateReplyEvent },
-  { label: 'Votes', file: 'votes.json', tag: VOTE_TAG, validate: validateVoteEvent, kind: 7 },
+  {
+    label: 'Votes',
+    file: 'votes.json',
+    tag: VOTE_TAG,
+    validate: validateVoteEvent,
+    kinds: [KIND_EVENT_REACTION, KIND_EXTERNAL_REACTION],
+  },
 ]
 
 function archivePaths(collection) {
@@ -109,7 +118,7 @@ async function syncOnce(pool, collection) {
 
   const events = await pool.querySync(
     RELAYS,
-    { kinds: [collection.kind || 1], '#t': [collection.tag], limit: 2000 },
+    { kinds: collection.kinds || [1], '#t': [collection.tag], limit: 2000 },
     { maxWait: 6000 },
   )
   const texts = new Map()
@@ -166,9 +175,9 @@ async function syncOnce(pool, collection) {
 }
 
 if (process.argv.includes('--help')) {
-  console.log(`Collect The Block Note declarations, anchored replies and free map votes from
-Nostr, pin their text on IPFS, complete their OpenTimestamps proofs, and write
-data/declarations.json, data/replies.json and data/map-votes.json.
+  console.log(`Collect The Block Note declarations, anchored replies, free votes and free map
+votes from Nostr, pin their text on IPFS, complete their OpenTimestamps proofs, and
+write data/declarations.json, data/replies.json, data/votes.json and data/map-votes.json.
 
 Usage:
   npm run declarations:pin              # one pass
@@ -181,6 +190,8 @@ Env:
   process.exit(0)
 }
 
+// Node's built-in WebSocket recurses when nostr-tools closes a relay that failed to connect.
+useWebSocketImplementation(WebSocket)
 const pool = new SimplePool()
 const watch = process.argv.includes('--watch')
 const pollMs = Number.parseInt(process.env.DECLARATIONS_POLL_MS || '', 10) || 600_000

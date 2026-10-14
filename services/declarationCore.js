@@ -118,23 +118,59 @@ export async function validateReplyEvent(event) {
 /**
  * An anchored vote is a standard Nostr reaction ("+" or "-") whose fingerprint covers
  * a text rebuilt from the reaction itself: direction, target, voter and time.
+ * Declarations are voted with a kind 7 reaction to their event id; on-chain messages
+ * (`txid_vout`) with a kind 17 reaction to external content (NIP-73 `bitcoin:tx:` tag).
  */
 export const VOTE_TAG = 'theblocknote-vote'
+export const KIND_EVENT_REACTION = 7
+export const KIND_EXTERNAL_REACTION = 17
+
+const EVENT_ID = /^[0-9a-f]{64}$/
+const MESSAGE_ID = /^([0-9a-f]{64})_(\d+)$/
+
+export function isMessageTarget(target) {
+  return MESSAGE_ID.test(String(target || ''))
+}
 
 export function voteText({ direction, target, pubkey, time }) {
   return [
-    `Vote ${direction === 'down' ? '-1' : '+1'} · nostr:${target}`,
+    `Vote ${direction === 'down' ? '-1' : '+1'} · ${isMessageTarget(target) ? 'bitcoin' : 'nostr'}:${target}`,
     `Voter: ${npubEncode(pubkey)}`,
     `The Block Note · ${new Date(time * 1000).toISOString()}`,
   ].join('\n')
 }
 
+/** Tags pointing a kind 17 reaction at an on-chain message. */
+export function messageVoteTags(target) {
+  const [, txid, vout] = String(target).match(MESSAGE_ID) || []
+  if (!txid) throw new Error('Not an on-chain message')
+  return [
+    ['i', `bitcoin:tx:${txid}`],
+    ['k', 'bitcoin:tx'],
+    ['vout', vout],
+  ]
+}
+
+/** The declaration event id or on-chain message `txid_vout` a reaction votes on. */
+export function voteTarget(event) {
+  if (event?.kind === KIND_EVENT_REACTION) {
+    const id = replyRoot(event)
+    return id && EVENT_ID.test(id) ? id : null
+  }
+  if (event?.kind === KIND_EXTERNAL_REACTION) {
+    const txid = tagValue(event, 'i')?.match(/^bitcoin:tx:([0-9a-f]{64})$/)?.[1]
+    const vout = tagValue(event, 'vout')
+    return txid && /^\d+$/.test(vout || '') ? `${txid}_${vout}` : null
+  }
+  return null
+}
+
 export async function validateVoteEvent(event) {
-  if (event?.kind !== 7 || !['+', '-'].includes(event.content)) return null
-  const target = replyRoot(event)
+  if (!['+', '-'].includes(event?.content)) return null
+  const target = voteTarget(event)
   const digestHex = tagValue(event, 'x')
   const cid = tagValue(event, 'cid')
-  if (!target || !/^[0-9a-f]{64}$/.test(target) || !digestHex || !cid) return null
+  if (!target || !digestHex || !cid) return null
   const direction = event.content === '-' ? 'down' : 'up'
   const text = voteText({ direction, target, pubkey: event.pubkey, time: event.created_at })
   const digest = await sha256(textToBytes(text))
