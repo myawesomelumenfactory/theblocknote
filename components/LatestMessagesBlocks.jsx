@@ -1,6 +1,7 @@
 import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from "framer-motion";
 import GlassCard from "./GlassCard";
+import TranslateButton from "./TranslateButton";
 import { decodeOpReturn } from '../services/TheBlockNote';
 import { Activity, ChevronUp, ChevronDown, Clock, List, Loader2, MessageCircle } from "lucide-react";
 import { applyVoteUp, applyVoteDown, applyComment, getHighestFundedUnit } from '../services/BitcoinService';
@@ -732,6 +733,7 @@ export default function LatestMessagesBlocks() {
                     {msg.unconfirmed ? ` · ${t('messages.unconfirmedDetail')}` : ''}
                   </p>
                 )}
+                <TranslateButton text={msg.value} className="mt-2" textClassName="text-white text-lg" />
               </div>
               
               {/* Voting Controls at Bottom */}
@@ -870,6 +872,7 @@ export default function LatestMessagesBlocks() {
                                     </span>
                                   ) : null}
                                 </div>
+                                <TranslateButton text={comment.text} className="mt-1" textClassName="text-white text-sm" />
                                 {comment.unconfirmed ? (
                                   <p className="text-white/35 text-xs mt-1">
                                     {t('messages.unconfirmedDetail')}

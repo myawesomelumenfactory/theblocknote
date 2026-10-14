@@ -51,7 +51,7 @@ html[data-theme="bitcoin-orange"] {
 }
 
 html[data-theme="timeline"] {
-  --app-zoom: 0.8;
+  --app-zoom: 0.75;
   --theme-body: #ffffff;
   --theme-bg: linear-gradient(#ffffff, #ffffff);
   --theme-accent: #1d9bf0;

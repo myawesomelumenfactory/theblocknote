@@ -1,6 +1,6 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { ChevronUp, Globe2, Loader2, Search } from 'lucide-react'
+import { Check, ChevronUp, Globe2, Loader2, Search, ShieldCheck } from 'lucide-react'
 import GlassCard from '../components/GlassCard'
 import { windowMotion } from '../services/introMotion'
 import { SharedContext } from '../src/SharedContext'
@@ -20,8 +20,12 @@ import immutablesData, { immutablesState } from 'virtual:immutables'
 import { useLanguage } from '../src/i18n/LanguageContext'
 import { useTheme } from '../src/theme/ThemeContext'
 import { pointerOffset } from '../services/pageZoom'
+import { fetchMapVotes, postMapVote, resolveMapVoteStatuses, tallyMapVotes } from '../services/mapVotes'
+import { getFreeNoteIdentity } from '../services/freeNotes'
+import { gatewayUrl } from '../services/ipfs'
 
 const FEE = 450
+const MODES = ['free', 'chain']
 
 const MAP_COLORS = {
   dark: {
@@ -46,7 +50,7 @@ export default function MapPage() {
   const { t, locale } = useLanguage()
   const { refs, setCurrentIndex, ensureUtxoHex } = useContext(SharedContext)
   const { theme } = useTheme()
-  const colors = theme === 'bitcoin-orange' ? MAP_COLORS.light : MAP_COLORS.dark
+  const colors = theme === 'deep-ledger' ? MAP_COLORS.dark : MAP_COLORS.light
 
   const [records, setRecords] = useState([])
   const [pendingVotes, setPendingVotes] = useState([])
@@ -58,7 +62,13 @@ export default function MapPage() {
   const [votingCode, setVotingCode] = useState(null)
   const [error, setError] = useState(null)
   const [lastTx, setLastTx] = useState(null)
+  const [mode, setMode] = useState('free')
+  const [freeVotes, setFreeVotes] = useState([])
+  const [voteStep, setVoteStep] = useState(null)
+  const [freeNotice, setFreeNotice] = useState(null)
+  const [anchorSummary, setAnchorSummary] = useState(null)
 
+  const freeIdentity = useMemo(() => getFreeNoteIdentity(), [])
   const mapRef = useRef(null)
   const countries = useMemo(() => getWorldCountries(), [])
   const countryByCode = useMemo(
@@ -82,10 +92,32 @@ export default function MapPage() {
     }
   }, [])
 
+  useEffect(() => {
+    let cancelled = false
+    fetchMapVotes().then((rows) => {
+      if (cancelled) return
+      setFreeVotes((prev) => {
+        const ids = new Set(rows.map((v) => v.eventId))
+        return [...prev.filter((v) => !ids.has(v.eventId)), ...rows]
+      })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const votes = useMemo(
-    () => countCountryVotes([...records, ...pendingVotes]),
-    [records, pendingVotes]
+    () =>
+      mode === 'free'
+        ? tallyMapVotes(freeVotes)
+        : countCountryVotes([...records, ...pendingVotes]),
+    [mode, freeVotes, records, pendingVotes]
   )
+  const myFreeCodes = useMemo(
+    () => new Set(freeVotes.filter((v) => v.pubkey === freeIdentity.pubkey).map((v) => v.code)),
+    [freeVotes, freeIdentity]
+  )
+  const canVoteFor = (code) => (mode === 'free' ? !myFreeCodes.has(code) : hasFundedUnit)
   const maxVotes = useMemo(() => Math.max(0, ...votes.values()), [votes])
   const totalVotes = useMemo(
     () => [...votes.values()].reduce((sum, n) => sum + n, 0),
@@ -119,9 +151,38 @@ export default function MapPage() {
     setTooltipPos({ x, y })
   }, [])
 
+  const castFreeVote = useCallback(
+    async (code) => {
+      const country = countryByCode.get(code)
+      if (!country) return
+      setVoting(true)
+      setVotingCode(code)
+      setError(null)
+      setLastTx(null)
+      setFreeNotice(null)
+      try {
+        const result = await postMapVote(country, setVoteStep)
+        setFreeVotes((prev) => [result.vote, ...prev])
+        setFreeNotice({ cid: result.cid, relays: result.relays, name: country.name })
+      } catch (err) {
+        console.error(err)
+        setError(err.message || t('map.voteFailed'))
+      } finally {
+        setVoting(false)
+        setVotingCode(null)
+        setVoteStep(null)
+      }
+    },
+    [countryByCode, t]
+  )
+
   const castVote = useCallback(
     async (code) => {
       if (!code) return
+      if (mode === 'free') {
+        await castFreeVote(code)
+        return
+      }
       if (!hasFundedUnit) {
         setError(t('compose.noFundedUnit'))
         return
@@ -162,14 +223,37 @@ export default function MapPage() {
         setVotingCode(null)
       }
     },
-    [hasFundedUnit, refs, setCurrentIndex, ensureUtxoHex, t]
+    [mode, castFreeVote, hasFundedUnit, refs, setCurrentIndex, ensureUtxoHex, t]
   )
 
   const selectCountry = (code) => {
     setSelectedCode(code)
     setError(null)
     setLastTx(null)
+    setFreeNotice(null)
   }
+
+  useEffect(() => {
+    if (mode !== 'free' || !selectedCode) {
+      setAnchorSummary(null)
+      return
+    }
+    const byVoter = new Map()
+    for (const vote of freeVotes) {
+      if (vote.code === selectedCode && !byVoter.has(vote.pubkey)) byVoter.set(vote.pubkey, vote)
+    }
+    const list = [...byVoter.values()]
+    let cancelled = false
+    setAnchorSummary({ code: selectedCode, checking: true })
+    resolveMapVoteStatuses(list).then((statuses) => {
+      if (cancelled) return
+      const anchored = [...statuses.values()].filter((s) => s.status === 'anchored').length
+      setAnchorSummary({ code: selectedCode, anchored, pending: list.length - anchored })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [mode, selectedCode, freeVotes])
 
   return (
     <motion.div
@@ -189,8 +273,34 @@ export default function MapPage() {
                 {t('map.eyebrow')}
               </div>
               <h2 className="text-2xl md:text-3xl font-bold text-white">{t('map.title')}</h2>
-              <p className="text-white/60 mt-2 max-w-2xl leading-relaxed">{t('map.lead')}</p>
-              <p className="text-white/40 text-xs mt-3 font-mono">{t('map.protocolHint')}</p>
+              <p className="text-white/60 mt-2 max-w-2xl leading-relaxed">
+                {mode === 'free' ? t('map.leadFree') : t('map.lead')}
+              </p>
+              <p className="text-white/40 text-xs mt-3 font-mono">
+                {mode === 'free' ? t('map.protocolHintFree') : t('map.protocolHint')}
+              </p>
+              <div className="flex flex-wrap gap-2 mt-4" role="group" aria-label={t('map.modeLabel')}>
+                {MODES.map((id) => (
+                  <button
+                    key={id}
+                    type="button"
+                    aria-pressed={mode === id}
+                    onClick={() => {
+                      setMode(id)
+                      setError(null)
+                      setLastTx(null)
+                      setFreeNotice(null)
+                    }}
+                    className={`rounded-full px-3 py-1 text-xs font-semibold border ${
+                      mode === id
+                        ? 'border-[color:var(--theme-accent-strong)] bg-[color:var(--theme-accent-strong)]/15 text-white'
+                        : 'border-white/10 text-white/55 hover:bg-white/5'
+                    }`}
+                  >
+                    {t(`map.mode.${id}`)}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/70">
               {formatVotes(totalVotes)}
@@ -293,26 +403,57 @@ export default function MapPage() {
                 <div className="text-sm tabular-nums text-[color:var(--theme-accent-soft)] mt-1">
                   {formatVotes(votes.get(selected.code) || 0)}
                 </div>
+                {mode === 'free' && anchorSummary?.code === selected.code && (votes.get(selected.code) || 0) > 0 ? (
+                  <div className="flex items-center gap-1.5 text-xs text-white/50 mt-1">
+                    <ShieldCheck className="w-3.5 h-3.5 text-[color:var(--theme-accent)]" />
+                    {anchorSummary.checking
+                      ? t('map.checkingAnchors')
+                      : t('map.anchorSummary', { anchored: anchorSummary.anchored, pending: anchorSummary.pending })}
+                  </div>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => castVote(selected.code)}
-                  disabled={voting || !hasFundedUnit}
+                  disabled={voting || !canVoteFor(selected.code)}
                   className="mt-4 w-full rounded-xl bg-[color:var(--theme-accent-strong)] text-black font-semibold px-4 py-2.5 text-sm hover:brightness-110 disabled:opacity-40 inline-flex items-center justify-center gap-2"
                 >
                   {voting && votingCode === selected.code ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : mode === 'free' && myFreeCodes.has(selected.code) ? (
+                    <Check className="w-4 h-4" />
                   ) : (
                     <ChevronUp className="w-4 h-4" />
                   )}
-                  {t('map.upvoteCountry', { name: selected.name })}
+                  {voting && votingCode === selected.code && voteStep
+                    ? t(voteStep === 'stamping' ? 'map.stepStamping' : 'map.stepPublishing')
+                    : mode === 'free' && myFreeCodes.has(selected.code)
+                      ? t('map.voted')
+                      : t('map.upvoteCountry', { name: selected.name })}
                 </button>
               </div>
             ) : (
               <p className="text-sm text-white/50 py-4 text-center">{t('map.pickCountry')}</p>
             )}
 
-            {!hasFundedUnit ? <p className="text-xs text-white/40">{t('map.needSpark')}</p> : null}
+            {mode === 'free' ? (
+              <p className="text-xs text-white/40">{t('map.freeHint')}</p>
+            ) : !hasFundedUnit ? (
+              <p className="text-xs text-white/40">{t('map.needSpark')}</p>
+            ) : null}
             {error ? <p className="text-sm text-red-300">{error}</p> : null}
+            {freeNotice ? (
+              <p className="text-xs text-[color:var(--theme-accent-soft)]">
+                {t('map.freeVoteOk', { name: freeNotice.name, count: freeNotice.relays })}{' '}
+                <a
+                  href={gatewayUrl(freeNotice.cid)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-white"
+                >
+                  {t('map.viewIpfs')}
+                </a>
+              </p>
+            ) : null}
             {lastTx ? (
               <a
                 href={`https://mempool.space/tx/${lastTx}`}
@@ -327,7 +468,9 @@ export default function MapPage() {
 
           <GlassCard className="p-6 md:p-8">
             <h3 className="text-lg font-bold text-white mb-1">{t('map.rankingTitle')}</h3>
-            <p className="text-sm text-white/50 mb-4">{t('map.rankingLead')}</p>
+            <p className="text-sm text-white/50 mb-4">
+              {mode === 'free' ? t('map.rankingLeadFree') : t('map.rankingLead')}
+            </p>
 
             {ranking.length === 0 ? (
               <p className="text-sm text-white/40 py-6 text-center">{t('map.rankingEmpty')}</p>
@@ -368,13 +511,19 @@ export default function MapPage() {
                           </button>
                           <button
                             type="button"
-                            title={t('map.upvoteCountry', { name: row.name })}
-                            disabled={voting || !hasFundedUnit}
+                            title={
+                              mode === 'free' && myFreeCodes.has(row.code)
+                                ? t('map.voted')
+                                : t('map.upvoteCountry', { name: row.name })
+                            }
+                            disabled={voting || !canVoteFor(row.code)}
                             onClick={() => castVote(row.code)}
                             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/80 hover:border-[color:var(--theme-accent-strong)] hover:bg-[color:var(--theme-accent-strong)]/20 hover:text-white disabled:opacity-40"
                           >
                             {voting && votingCode === row.code ? (
                               <Loader2 className="h-4 w-4 animate-spin text-[color:var(--theme-accent)]" />
+                            ) : mode === 'free' && myFreeCodes.has(row.code) ? (
+                              <Check className="h-4 w-4" />
                             ) : (
                               <ChevronUp className="h-4 w-4" />
                             )}
