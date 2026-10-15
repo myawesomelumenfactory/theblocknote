@@ -12,13 +12,16 @@ import {
 import {
   DECLARATION_MAX,
   DECLARATION_TAG,
+  KIND_COMMENT,
   KIND_EVENT_REACTION,
   KIND_EXTERNAL_REACTION,
+  REPLY_MAX,
   REPLY_TAG,
   VOTE_TAG,
   fingerprintText,
+  messageCommentTags,
   messageVoteTags,
-  replyRoot,
+  replyTarget,
   validateDeclarationEvent,
   validateReplyEvent,
   validateVoteEvent,
@@ -28,7 +31,7 @@ import {
 import { fetchTextByCid } from './ipfs'
 import { FREE_NOTE_RELAYS, getFreeNoteIdentity } from './freeNotes'
 
-export const DECLARATION_REPLY_MAX = 280
+export { REPLY_MAX }
 
 const KIND_NOTE = 1
 
@@ -276,17 +279,51 @@ export async function fetchDeclarationReactions(eventIds) {
   ])
 
   const seen = await collectVotes(reactions, events, archivedVotes)
+  await collectReplies(reactions, events, seen)
+  return reactions
+}
+
+/**
+ * Free anchored votes (kind 17 reactions) and comments (kind 1111) on on-chain messages,
+ * both pointing at `bitcoin:tx:<txid>`, from relays and from the pinned archives.
+ * Each key counts once per message.
+ * @param {string[]} indices on-chain message ids (`txid_vout`)
+ * @returns {Promise<Map<string, { ups: Set<string>, downs: Set<string>, votes: Map<string, object>, replies: object[] }>>}
+ */
+export async function fetchMessageReactions(indices) {
+  const entries = new Map(
+    indices.map((index) => [index, { ups: new Set(), downs: new Set(), votes: new Map(), replies: [] }]),
+  )
+  if (indices.length === 0) return entries
+  const txids = [...new Set(indices.map((index) => index.split('_')[0]))]
+  const [events, archivedVotes] = await Promise.all([
+    getPool()
+      .querySync(
+        FREE_NOTE_RELAYS,
+        { kinds: [KIND_EXTERNAL_REACTION, KIND_COMMENT], '#i': txids.map((txid) => `bitcoin:tx:${txid}`) },
+        { maxWait: 4000 },
+      )
+      .catch(() => []),
+    loadArchive('votes'),
+  ])
+  const seen = await collectVotes(entries, events, archivedVotes)
+  await collectReplies(entries, events, seen)
+  return entries
+}
+
+/** Add relay and archived replies to `entries` (keyed by the target they answer). */
+async function collectReplies(entries, events, seen) {
   for (const event of events) {
-    if (seen.has(event.id) || event.kind !== KIND_NOTE) continue
+    if (seen.has(event.id) || (event.kind !== KIND_NOTE && event.kind !== KIND_COMMENT)) continue
     seen.add(event.id)
-    const target = reactions.get(replyRoot(event))
+    const target = entries.get(replyTarget(event))
     if (!target || !event.content || !verifyEvent(event)) continue
     const reply = await toReply(event)
     if (reply) target.replies.push(reply)
   }
   const texts = readJson(TEXT_CACHE_STORAGE)
   const archived = (await loadArchive('replies')).filter(
-    (row) => row?.eventId && row.cid && row.digest && reactions.has(row.root) && !seen.has(row.eventId),
+    (row) => row?.eventId && row.cid && row.digest && entries.has(row.root) && !seen.has(row.eventId),
   )
   await Promise.all(
     archived.map(async (row) => {
@@ -299,7 +336,7 @@ export async function fetchDeclarationReactions(eventIds) {
           return
         }
       }
-      reactions.get(row.root).replies.push({
+      entries.get(row.root).replies.push({
         id: row.eventId,
         pubkey: row.pubkey,
         time: row.created_at,
@@ -313,33 +350,7 @@ export async function fetchDeclarationReactions(eventIds) {
       })
     }),
   )
-
-  for (const entry of reactions.values()) entry.replies.sort((a, b) => a.time - b.time)
-  return reactions
-}
-
-/**
- * Free anchored votes on on-chain messages (kind 17 reactions to `bitcoin:tx:<txid>`),
- * from relays and from the pinned archive. Each key counts once per message.
- * @param {string[]} indices on-chain message ids (`txid_vout`)
- * @returns {Promise<Map<string, { ups: Set<string>, downs: Set<string>, votes: Map<string, object> }>>}
- */
-export async function fetchMessageVotes(indices) {
-  const entries = new Map(indices.map((index) => [index, { ups: new Set(), downs: new Set(), votes: new Map() }]))
-  if (indices.length === 0) return entries
-  const txids = [...new Set(indices.map((index) => index.split('_')[0]))]
-  const [events, archivedVotes] = await Promise.all([
-    getPool()
-      .querySync(
-        FREE_NOTE_RELAYS,
-        { kinds: [KIND_EXTERNAL_REACTION], '#i': txids.map((txid) => `bitcoin:tx:${txid}`) },
-        { maxWait: 4000 },
-      )
-      .catch(() => []),
-    loadArchive('votes'),
-  ])
-  await collectVotes(entries, events, archivedVotes)
-  return entries
+  for (const entry of entries.values()) entry.replies.sort((a, b) => a.time - b.time)
 }
 
 /**
@@ -486,17 +497,37 @@ async function castVote({ kind, target, tags }, direction, onStep) {
 }
 
 /** Reply to a declaration, stamped and anchored in Bitcoin like the declaration itself. */
-export async function replyToDeclaration(decl, text, onStep) {
-  const content = String(text || '').trim().slice(0, DECLARATION_REPLY_MAX)
-  if (!content) throw new Error('Write something first')
-  const { event, cid, digestHex, proof } = await stampAndPublish(
+export function replyToDeclaration(decl, text, onStep) {
+  return publishReply(
     {
-      content,
-      topic: REPLY_TAG,
       tags: [
         ['e', decl.eventId, FREE_NOTE_RELAYS[0], 'root'],
         ['p', decl.pubkey],
       ],
+    },
+    text,
+    onStep,
+  )
+}
+
+/**
+ * Comment on an on-chain message for free: a NIP-22 comment on its Bitcoin transaction,
+ * stamped and anchored in Bitcoin like replies to declarations.
+ * @param {string} index on-chain message id (`txid_vout`)
+ */
+export function replyToMessage(index, text, onStep) {
+  return publishReply({ kind: KIND_COMMENT, tags: messageCommentTags(index) }, text, onStep)
+}
+
+async function publishReply({ kind = KIND_NOTE, tags }, text, onStep) {
+  const content = String(text || '').trim().slice(0, REPLY_MAX)
+  if (!content) throw new Error('Write something first')
+  const { event, cid, digestHex, proof } = await stampAndPublish(
+    {
+      kind,
+      content,
+      topic: REPLY_TAG,
+      tags,
       alt: 'The Block Note reply anchored in Bitcoin through OpenTimestamps',
     },
     onStep,

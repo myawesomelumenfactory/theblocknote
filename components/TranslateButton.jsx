@@ -33,7 +33,7 @@ export default function TranslateButton({ text, className = '', textClassName = 
         type="button"
         onClick={toggle}
         disabled={state.status === 'loading'}
-        className="inline-flex items-center gap-1 text-[12px] text-[color:var(--theme-accent)] hover:underline disabled:opacity-60"
+        className="inline-flex items-center gap-1 text-[13px] text-[color:var(--theme-accent)] hover:underline disabled:opacity-60"
       >
         {state.status === 'loading' ? (
           <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -43,12 +43,12 @@ export default function TranslateButton({ text, className = '', textClassName = 
         {state.status === 'loading' ? t('translate.loading') : shown ? t('translate.hide') : t('translate.show')}
       </button>
       {state.status === 'error' ? (
-        <p className="text-[12px] text-red-400 mt-1">{t('translate.failed')}</p>
+        <p className="text-[13px] text-red-400 mt-1">{t('translate.failed')}</p>
       ) : null}
       {shown ? (
         <div className="mt-1 border-l-2 border-[color:var(--theme-accent)]/40 pl-2">
           <p className={textClassName}>{state.same ? t('translate.same') : state.text}</p>
-          <p className="text-[11px] text-[color:var(--theme-fg-subtle)] mt-0.5">
+          <p className="text-[12px] text-[color:var(--theme-fg-subtle)] mt-0.5">
             {t('translate.credit', { provider: state.provider })}
           </p>
         </div>
