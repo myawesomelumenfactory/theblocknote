@@ -23,9 +23,9 @@ import {
 import immutablesData, { immutablesState } from 'virtual:immutables'
 import { SharedContext } from '../src/SharedContext'
 import { useLanguage } from '../src/i18n/LanguageContext'
-import { applyComment, getHighestFundedUnit, sendBitcoinTransaction, validateUTXO } from '../services/BitcoinService'
+import { getHighestFundedUnit, sendBitcoinTransaction, validateUTXO } from '../services/BitcoinService'
 import { appendImmutable, loadImmutableRecords, subscribeImmutables } from '../services/ImmutablesStore'
-import { COMMENT_TEXT_MAX, MESSAGE_TEXT_MAX, encodeMessage } from '../services/immutableProtocol'
+import { MESSAGE_TEXT_MAX, encodeMessage } from '../services/immutableProtocol'
 import {
   FALLBACK_CATEGORY,
   TIMELINE_CATEGORIES,
@@ -36,14 +36,16 @@ import {
   trendingScore,
 } from '../services/timeline'
 import {
-  DECLARATION_REPLY_MAX,
+  REPLY_MAX,
   fetchDeclarationReactions,
   fetchDeclarations,
-  fetchMessageVotes,
+  fetchMessageReactions,
   postDeclaration,
   replyToDeclaration,
   resolveDeclarationStatuses,
   shortNpub,
+  replyToMessage,
+  subscribeLiveNotes,
   voteDeclaration,
   voteMessage,
 } from '../services/declarations'
@@ -54,6 +56,8 @@ import TranslateButton from './TranslateButton'
 
 const FEE = 450
 const PAGE_SIZE = 20
+const RECHECK_EVERY_MS = 2 * 60 * 1000
+const LIVE_REFRESH_DELAY_MS = 1500
 const CATEGORY_ICONS = {
   bitcoin: Bitcoin,
   voices: Megaphone,
@@ -164,10 +168,9 @@ function voteStatusTitle(voteStatus, t, locale) {
   return voteStatus ? t('timeline.votePending') : t('timeline.checking')
 }
 
-function PostItem({ post, t, locale, myVote, canAct, busy, open, onToggle, onVote, onReply, highlighted, status, replyStatuses, voteStatus }) {
+function PostItem({ post, t, locale, myVote, busy, open, onToggle, onVote, onReply, highlighted, status, replyStatuses, voteStatus }) {
   const [draft, setDraft] = useState('')
   const declaration = post.kind === 'declaration'
-  const replyMax = declaration ? DECLARATION_REPLY_MAX : COMMENT_TEXT_MAX
   return (
     <article
       id={`post-${post.index}`}
@@ -178,33 +181,33 @@ function PostItem({ post, t, locale, myVote, canAct, busy, open, onToggle, onVot
       <div className="flex gap-3">
         <Avatar seed={post.seed} />
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1 text-[15px] min-w-0">
+          <div className="flex items-center gap-1 text-[17px] min-w-0">
             <span className="font-bold text-white truncate">{t('timeline.entity')}</span>
             <span className="text-[color:var(--theme-fg-muted)] truncate">
               {post.handle} · {relativeTime(post.time, locale)}
             </span>
             {declaration ? (
-              <span className="ml-1 text-[11px] text-[color:var(--theme-accent)] border border-[color:var(--theme-accent)]/40 rounded-full px-1.5">
+              <span className="ml-1 text-[12px] text-[color:var(--theme-accent)] border border-[color:var(--theme-accent)]/40 rounded-full px-1.5">
                 {t('timeline.declared')}
               </span>
             ) : null}
             {post.unconfirmed ? (
-              <span className="ml-1 text-[11px] text-[color:var(--theme-fg-muted)] border border-[color:var(--theme-card-border)] rounded-full px-1.5">
+              <span className="ml-1 text-[12px] text-[color:var(--theme-fg-muted)] border border-[color:var(--theme-card-border)] rounded-full px-1.5">
                 {t('timeline.mempool')}
               </span>
             ) : null}
-            <span className={`ml-auto text-[12px] shrink-0 ${CATEGORY_COLORS[post.category] || 'text-[color:var(--theme-accent)]'}`}>
+            <span className={`ml-auto text-[13px] shrink-0 ${CATEGORY_COLORS[post.category] || 'text-[color:var(--theme-accent)]'}`}>
               {t(`timeline.cat.${post.category}`)}
             </span>
           </div>
-          <p className="text-[15px] leading-5 text-white whitespace-pre-wrap break-words mt-0.5">{post.text}</p>
+          <p className="text-[17px] leading-6 text-white whitespace-pre-wrap break-words mt-0.5">{post.text}</p>
           <TranslateButton
             text={post.text}
             className="mt-1"
-            textClassName="text-[15px] leading-5 text-white whitespace-pre-wrap break-words"
+            textClassName="text-[17px] leading-6 text-white whitespace-pre-wrap break-words"
           />
 
-          <div className="flex items-center justify-between max-w-md mt-2 -ml-2 text-[13px] text-[color:var(--theme-fg-muted)]">
+          <div className="flex items-center justify-between max-w-md mt-2 -ml-2 text-[15px] text-[color:var(--theme-fg-muted)]">
             <button
               type="button"
               onClick={onToggle}
@@ -266,10 +269,12 @@ function PostItem({ post, t, locale, myVote, canAct, busy, open, onToggle, onVot
                 target="_blank"
                 rel="noopener noreferrer"
                 title={new Date(post.time * 1000).toLocaleString(locale)}
-                className="inline-flex items-center gap-1 rounded-full px-2 py-1 hover:text-[color:var(--theme-accent)]"
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-1 hover:underline ${
+                  post.unconfirmed ? '' : 'text-emerald-600'
+                }`}
               >
-                <ExternalLink className="w-[16px] h-[16px]" />
-                {t('timeline.onChain')}
+                {post.unconfirmed ? <Clock className="w-[16px] h-[16px]" /> : <ShieldCheck className="w-[16px] h-[16px]" />}
+                {t(post.unconfirmed ? 'timeline.pending' : 'timeline.inBitcoin')}
               </a>
             )}
           </div>
@@ -279,14 +284,14 @@ function PostItem({ post, t, locale, myVote, canAct, busy, open, onToggle, onVot
               {post.comments.map((comment) => (
                 <div key={comment.txid} className="flex gap-2">
                   <Avatar seed={comment.seed || comment.txid} size={24} />
-                  <div className="min-w-0 text-[14px]">
+                  <div className="min-w-0 text-[16px]">
                     <span className="text-[color:var(--theme-fg-muted)]">
                       {comment.handle || `@${comment.txid.slice(0, 8)}`} · {relativeTime(comment.time, locale)}
                     </span>
                     <p className="text-white break-words">{comment.text}</p>
                     <TranslateButton text={comment.text} textClassName="text-white break-words" />
                     {comment.anchored ? (
-                      <div className="flex items-center -ml-2 text-[12px] text-[color:var(--theme-fg-muted)]">
+                      <div className="flex items-center -ml-2 text-[13px] text-[color:var(--theme-fg-muted)]">
                         <DeclarationBadge status={replyStatuses?.get(comment.txid)} t={t} locale={locale} />
                         <a
                           href={gatewayUrl(comment.cid)}
@@ -304,7 +309,7 @@ function PostItem({ post, t, locale, myVote, canAct, busy, open, onToggle, onVot
                 </div>
               ))}
               {post.comments.length === 0 ? (
-                <p className="text-[13px] text-[color:var(--theme-fg-muted)]">{t('timeline.noReplies')}</p>
+                <p className="text-[15px] text-[color:var(--theme-fg-muted)]">{t('timeline.noReplies')}</p>
               ) : null}
               <form
                 className="flex items-center gap-2"
@@ -315,24 +320,17 @@ function PostItem({ post, t, locale, myVote, canAct, busy, open, onToggle, onVot
               >
                 <input
                   value={draft}
-                  onChange={(event) => setDraft(event.target.value.slice(0, replyMax))}
-                  disabled={!canAct}
-                  placeholder={
-                    declaration
-                      ? t('timeline.replyAnchoredPlaceholder')
-                      : canAct
-                        ? t('timeline.replyPlaceholder')
-                        : t('timeline.needUnit')
-                  }
-                  className="flex-1 min-w-0 bg-transparent border-b border-[color:var(--theme-card-border)] py-1.5 text-[14px] text-white placeholder-[color:var(--theme-fg-subtle)] focus:outline-none focus:border-[color:var(--theme-accent)]"
+                  onChange={(event) => setDraft(event.target.value.slice(0, REPLY_MAX))}
+                  placeholder={t('timeline.replyAnchoredPlaceholder')}
+                  className="flex-1 min-w-0 bg-transparent border-b border-[color:var(--theme-card-border)] py-1.5 text-[16px] text-white placeholder-[color:var(--theme-fg-subtle)] focus:outline-none focus:border-[color:var(--theme-accent)]"
                 />
-                <span className="text-[12px] tabular-nums text-[color:var(--theme-fg-subtle)]">
-                  {replyMax - draft.length}
+                <span className="text-[13px] tabular-nums text-[color:var(--theme-fg-subtle)]">
+                  {REPLY_MAX - draft.length}
                 </span>
                 <button
                   type="submit"
-                  disabled={!canAct || !draft.trim() || busy === 'reply'}
-                  className="rounded-full bg-[color:var(--theme-accent)] text-white font-bold text-[13px] px-4 py-1.5 disabled:opacity-50"
+                  disabled={!draft.trim() || busy === 'reply'}
+                  className="rounded-full bg-[color:var(--theme-accent)] text-white font-bold text-[15px] px-4 py-1.5 disabled:opacity-50"
                 >
                   {busy === 'reply' ? <Loader2 className="w-4 h-4 animate-spin" /> : t('timeline.reply')}
                 </button>
@@ -367,7 +365,7 @@ export default function Timeline() {
   const [declarations, setDeclarations] = useState([])
   const [declStatuses, setDeclStatuses] = useState(new Map())
   const [declReactions, setDeclReactions] = useState(new Map())
-  const [messageVotes, setMessageVotes] = useState(new Map())
+  const [messageReactions, setMessageReactions] = useState(new Map())
   const [replyStatuses, setReplyStatuses] = useState(new Map())
   const [voteStatuses, setVoteStatuses] = useState(new Map())
 
@@ -408,22 +406,47 @@ export default function Timeline() {
 
   const chainPosts = useMemo(() => buildTimeline(records), [records])
   const chainKey = chainPosts.map((p) => p.index).join(',')
-  useEffect(() => {
+  const latestChainKey = useRef(chainKey)
+  latestChainKey.current = chainKey
+  const refreshMessageReactions = useCallback(async () => {
     if (!chainKey) return
-    let cancelled = false
-    fetchMessageVotes(chainKey.split(','))
-      .then((votes) => {
-        if (!cancelled) setMessageVotes(votes)
-      })
-      .catch((err) => console.warn('Message votes failed to load', err))
-    return () => {
-      cancelled = true
-    }
+    const reactions = await fetchMessageReactions(chainKey.split(','))
+    if (latestChainKey.current === chainKey) setMessageReactions(reactions)
   }, [chainKey])
 
+  useEffect(() => {
+    refreshMessageReactions().catch((err) => console.warn('Message reactions failed to load', err))
+  }, [refreshMessageReactions])
+
+  const refreshers = useRef({})
+  refreshers.current = { refreshDeclarations, refreshMessageReactions }
+  useEffect(() => {
+    let timer = null
+    const stop = subscribeLiveNotes(() => {
+      clearTimeout(timer)
+      timer = setTimeout(() => {
+        const { refreshDeclarations: decls, refreshMessageReactions: messages } = refreshers.current
+        Promise.all([decls(), messages()]).catch((err) => console.warn('Live refresh failed', err))
+      }, LIVE_REFRESH_DELAY_MS)
+    })
+    return () => {
+      clearTimeout(timer)
+      stop()
+    }
+  }, [])
+
   const posts = useMemo(() => {
+    const toComment = (r) => ({
+      txid: r.id,
+      time: r.time,
+      text: r.text,
+      seed: r.pubkey,
+      handle: `@${shortNpub(r.pubkey)}`,
+      anchored: Boolean(r.anchored),
+      cid: r.cid,
+    })
     const chain = chainPosts.map((p) => {
-      const free = messageVotes.get(p.index)
+      const free = messageReactions.get(p.index)
       return {
         ...p,
         kind: 'chain',
@@ -431,6 +454,7 @@ export default function Timeline() {
         handle: `@${p.txid.slice(0, 8)}`,
         ups: p.ups + (free?.ups.size || 0),
         downs: p.downs + (free?.downs.size || 0),
+        comments: [...p.comments, ...(free?.replies || []).map(toComment)].sort((a, b) => a.time - b.time),
       }
     })
     const declared = declarations.map((d) => {
@@ -447,22 +471,14 @@ export default function Timeline() {
         handle: `@${shortNpub(d.pubkey)}`,
         ups: reactions?.ups.size || 0,
         downs: reactions?.downs.size || 0,
-        comments: (reactions?.replies || []).map((r) => ({
-          txid: r.id,
-          time: r.time,
-          text: r.text,
-          seed: r.pubkey,
-          handle: `@${shortNpub(r.pubkey)}`,
-          anchored: Boolean(r.anchored),
-          cid: r.cid,
-        })),
+        comments: (reactions?.replies || []).map(toComment),
         category: categorize(d.text),
         hashtags: hashtagsOf(d.text),
         unconfirmed: false,
       }
     })
     return [...chain, ...declared].sort((a, b) => b.time - a.time)
-  }, [chainPosts, messageVotes, declarations, declReactions])
+  }, [chainPosts, messageReactions, declarations, declReactions])
   const trending = useMemo(() => buildTrending(posts), [posts])
   const categoryCounts = useMemo(() => {
     const counts = new Map()
@@ -573,7 +589,7 @@ export default function Timeline() {
 
   /** Free anchored votes on a post: declarations by event id, on-chain messages by `txid_vout`. */
   const freeVotesOn = (post) =>
-    post.kind === 'declaration' ? declReactions.get(post.eventId) : messageVotes.get(post.index)
+    post.kind === 'declaration' ? declReactions.get(post.eventId) : messageReactions.get(post.index)
 
   const myVoteOn = (post) => {
     const reactions = freeVotesOn(post)
@@ -592,7 +608,7 @@ export default function Timeline() {
     try {
       const vote = declaration ? await voteDeclaration(post, direction) : await voteMessage(post.index, direction)
       rememberVote(post.index, direction)
-      const setVotes = declaration ? setDeclReactions : setMessageVotes
+      const setVotes = declaration ? setDeclReactions : setMessageReactions
       setVotes((prev) => {
         const next = new Map(prev)
         const entry = next.get(key) || { ups: new Set(), downs: new Set(), votes: new Map(), replies: [] }
@@ -616,37 +632,18 @@ export default function Timeline() {
     if (!text.trim()) return false
     setPostBusy(post.index, 'reply')
     setNotice(null)
-    if (post.kind === 'declaration') {
-      try {
-        const reply = await replyToDeclaration(post, text)
-        setDeclReactions((prev) => {
-          const next = new Map(prev)
-          const entry = next.get(post.eventId) || { ups: new Set(), downs: new Set(), replies: [] }
-          next.set(post.eventId, { ...entry, replies: [...entry.replies, reply] })
-          return next
-        })
-        setReplyStatuses((prev) => new Map(prev).set(reply.id, { status: 'pending' }))
-        return true
-      } catch (err) {
-        setNotice({ type: 'error', text: err.message || t('timeline.replyFailed') })
-        return false
-      } finally {
-        setPostBusy(post.index, null)
-      }
-    }
+    const declaration = post.kind === 'declaration'
+    const key = declaration ? post.eventId : post.index
     try {
-      const { selected, utxo } = await spendUnit()
-      const [hash, vout] = post.index.split('_')
-      const result = await applyComment(utxo, hash, vout, text, FEE)
-      if (!result.success) throw new Error(result.error || t('timeline.replyFailed'))
-      await appendImmutable({
-        index: `${result.transactionId}_0`,
-        time: Math.floor(Date.now() / 1000),
-        value: result.encoded,
-        kind: 'comment',
-        unconfirmed: true,
+      const reply = declaration ? await replyToDeclaration(post, text) : await replyToMessage(post.index, text)
+      const setReactions = declaration ? setDeclReactions : setMessageReactions
+      setReactions((prev) => {
+        const next = new Map(prev)
+        const entry = next.get(key) || { ups: new Set(), downs: new Set(), votes: new Map(), replies: [] }
+        next.set(key, { ...entry, replies: [...entry.replies, reply] })
+        return next
       })
-      await finish(selected, result, t('timeline.replied'))
+      setReplyStatuses((prev) => new Map(prev).set(reply.id, { status: 'pending' }))
       return true
     } catch (err) {
       setNotice({ type: 'error', text: err.message || t('timeline.replyFailed') })
@@ -660,8 +657,10 @@ export default function Timeline() {
   useEffect(() => {
     const due = []
     for (const index of openThreads) {
-      if (!String(index).startsWith('decl:')) continue
-      for (const reply of declReactions.get(index.slice(5))?.replies || []) {
+      const entry = String(index).startsWith('decl:')
+        ? declReactions.get(index.slice(5))
+        : messageReactions.get(index)
+      for (const reply of entry?.replies || []) {
         if (!reply.anchored || requestedReplyStatuses.current.has(reply.id)) continue
         requestedReplyStatuses.current.add(reply.id)
         due.push(reply)
@@ -675,12 +674,12 @@ export default function Timeline() {
         return next
       }),
     )
-  }, [openThreads, declReactions])
+  }, [openThreads, declReactions, messageReactions])
 
   const requestedVoteStatuses = useRef(new Set())
   useEffect(() => {
     const due = []
-    for (const entry of [...declReactions.values(), ...messageVotes.values()]) {
+    for (const entry of [...declReactions.values(), ...messageReactions.values()]) {
       const mine = entry.votes?.get(freeIdentity.pubkey)
       if (!mine?.anchored || requestedVoteStatuses.current.has(mine.eventId)) continue
       requestedVoteStatuses.current.add(mine.eventId)
@@ -694,7 +693,39 @@ export default function Timeline() {
         return next
       }),
     )
-  }, [declReactions, messageVotes, freeIdentity])
+  }, [declReactions, messageReactions, freeIdentity])
+
+  const pendingState = useRef({})
+  pendingState.current = { declarations, declStatuses, declReactions, messageReactions, replyStatuses, voteStatuses }
+  useEffect(() => {
+    const recheck = async () => {
+      if (document.hidden) return
+      const { declarations: decls, declStatuses: dStat, declReactions: dReact, messageReactions: mReact, replyStatuses: rStat, voteStatuses: vStat } =
+        pendingState.current
+      const isPending = (statuses, id) => statuses.get(id)?.status === 'pending'
+      const pendingDecls = decls.filter((d) => isPending(dStat, d.eventId))
+      const pendingReplies = []
+      const pendingVotes = []
+      for (const entry of [...dReact.values(), ...mReact.values()]) {
+        for (const reply of entry.replies) if (reply.anchored && isPending(rStat, reply.eventId)) pendingReplies.push(reply)
+        for (const vote of entry.votes.values()) if (vote.anchored && isPending(vStat, vote.eventId)) pendingVotes.push(vote)
+      }
+      const options = { minIntervalMs: RECHECK_EVERY_MS - 5000 }
+      const merge = (setter) => (statuses) =>
+        setter((prev) => {
+          const next = new Map(prev)
+          for (const [id, status] of statuses) next.set(id, status)
+          return next
+        })
+      await Promise.all([
+        pendingDecls.length && resolveDeclarationStatuses(pendingDecls, options).then(merge(setDeclStatuses)),
+        pendingReplies.length && resolveDeclarationStatuses(pendingReplies, options).then(merge(setReplyStatuses)),
+        pendingVotes.length && resolveDeclarationStatuses(pendingVotes, options).then(merge(setVoteStatuses)),
+      ])
+    }
+    const id = setInterval(() => recheck().catch((err) => console.warn('Pending re-check failed', err)), RECHECK_EVERY_MS)
+    return () => clearInterval(id)
+  }, [])
 
   const myVoteStatus = (post) => {
     const mine = freeVotesOn(post)?.votes?.get(freeIdentity.pubkey)
@@ -740,10 +771,10 @@ export default function Timeline() {
         onClick={() => pickTopic(group.id)}
         className="w-full text-left px-4 pt-3 pb-1 hover:bg-white/[0.03]"
       >
-        <p className="text-[13px] text-[color:var(--theme-fg-muted)]">
+        <p className="text-[15px] text-[color:var(--theme-fg-muted)]">
           {t(group.count === 1 ? 'timeline.trendingInOne' : 'timeline.trendingIn', { count: group.count })}
         </p>
-        <p className="text-[15px] font-bold text-white">{topicLabel(group.id)}</p>
+        <p className="text-[17px] font-bold text-white">{topicLabel(group.id)}</p>
       </button>
       <ul className="pb-2">
         {group.posts.map((post) => (
@@ -753,8 +784,8 @@ export default function Timeline() {
               onClick={() => jumpTo(post)}
               className="w-full text-left px-4 py-1.5 hover:bg-white/[0.03]"
             >
-              <p className="text-[14px] text-white/90 line-clamp-2">{post.text}</p>
-              <p className="text-[12px] text-[color:var(--theme-fg-muted)] mt-0.5 flex items-center gap-3">
+              <p className="text-[16px] text-white/90 line-clamp-2">{post.text}</p>
+              <p className="text-[13px] text-[color:var(--theme-fg-muted)] mt-0.5 flex items-center gap-3">
                 <span className="inline-flex items-center gap-1">
                   <ArrowBigUp className="w-3 h-3" /> {post.ups}
                 </span>
@@ -786,8 +817,8 @@ export default function Timeline() {
         }`}
       >
         <Icon className={`w-6 h-6 shrink-0 ${color}`} strokeWidth={active ? 2.75 : 2} />
-        <span className={`flex-1 truncate text-[19px] text-white ${active ? 'font-bold' : ''}`}>{label}</span>
-        <span className="text-[13px] tabular-nums text-[color:var(--theme-fg-muted)]">{count}</span>
+        <span className={`flex-1 truncate text-[20px] text-white ${active ? 'font-bold' : ''}`}>{label}</span>
+        <span className="text-[15px] tabular-nums text-[color:var(--theme-fg-muted)]">{count}</span>
       </button>
     )
   }
@@ -832,14 +863,14 @@ export default function Timeline() {
           count: categoryCounts.get(id) || 0,
         }),
       )}
-      <h3 className="px-4 pt-5 pb-2 text-[15px] font-bold text-[color:var(--theme-fg-muted)]">
+      <h3 className="px-4 pt-5 pb-2 text-[17px] font-bold text-[color:var(--theme-fg-muted)]">
         {t('timeline.mostVotedTitle')}
       </h3>
       {voteSortItem('up')}
       {voteSortItem('down')}
       {navHashtags.length > 0 ? (
         <>
-          <h3 className="px-4 pt-5 pb-2 text-[15px] font-bold text-[color:var(--theme-fg-muted)]">
+          <h3 className="px-4 pt-5 pb-2 text-[17px] font-bold text-[color:var(--theme-fg-muted)]">
             {t('timeline.hashtagsTitle')}
           </h3>
           {navHashtags.map((group) =>
@@ -857,14 +888,14 @@ export default function Timeline() {
           className="sticky top-2 rounded-2xl border border-[color:var(--theme-card-border)] bg-[color:var(--theme-card-bg)] py-3"
           aria-label={t('timeline.categoriesTitle')}
         >
-          <h3 className="px-4 pb-2 text-xl font-bold text-white">{t('timeline.categoriesTitle')}</h3>
+          <h3 className="px-4 pb-2 text-2xl font-bold text-white">{t('timeline.categoriesTitle')}</h3>
           {categoryList}
         </nav>
       </aside>
 
       <main className="w-full max-w-[680px] min-w-0 border-x lg:border lg:rounded-2xl lg:mt-2 overflow-clip border-[color:var(--theme-card-border)] bg-[color:var(--theme-card-bg)]">
         <div className="sticky top-0 z-10 bg-[color:var(--theme-card-bg)] backdrop-blur-xl backdrop-saturate-150 border-b border-[color:var(--theme-card-border)]">
-          <h2 className="px-4 pt-3 pb-1 text-xl font-bold text-white">{t('timeline.home')}</h2>
+          <h2 className="px-4 pt-3 pb-1 text-2xl font-bold text-white">{t('timeline.home')}</h2>
           <div className="flex" role="tablist">
             {['latest', 'trending', 'topics', 'categories'].map((id) => (
               <button
@@ -873,7 +904,7 @@ export default function Timeline() {
                 role="tab"
                 aria-selected={tab === id}
                 onClick={() => setTab(id)}
-                className={`flex-1 py-3 text-[15px] hover:bg-white/[0.06] ${
+                className={`flex-1 py-3 text-[17px] hover:bg-white/[0.06] ${
                   id === 'topics' ? 'lg:hidden' : id === 'categories' ? 'xl:hidden' : ''
                 }`}
               >
@@ -905,7 +936,7 @@ export default function Timeline() {
                     setMode(id)
                     setDraft((d) => d.slice(0, id === 'free' ? DECLARATION_MAX : MESSAGE_TEXT_MAX))
                   }}
-                  className={`rounded-full px-3 py-1 text-[13px] font-semibold border ${
+                  className={`rounded-full px-3 py-1 text-[15px] font-semibold border ${
                     mode === id
                       ? 'border-[color:var(--theme-accent)] bg-[color:var(--theme-accent)]/10 text-[color:var(--theme-accent)]'
                       : 'border-[color:var(--theme-card-border)] text-[color:var(--theme-fg-muted)] hover:bg-white/[0.06]'
@@ -920,10 +951,10 @@ export default function Timeline() {
               onChange={(event) => setDraft(event.target.value.slice(0, draftMax))}
               placeholder={mode === 'free' ? t('timeline.declarePlaceholder') : t('timeline.composePlaceholder')}
               rows={mode === 'free' ? 3 : 2}
-              className="w-full bg-transparent resize-none text-xl text-white placeholder-[color:var(--theme-fg-subtle)] focus:outline-none py-2"
+              className="w-full bg-transparent resize-none text-2xl text-white placeholder-[color:var(--theme-fg-subtle)] focus:outline-none py-2"
             />
             <div className="flex items-center justify-between gap-3 border-t border-[color:var(--theme-card-border)] pt-2">
-              <span className="text-[13px] text-[color:var(--theme-fg-muted)] truncate">
+              <span className="text-[15px] text-[color:var(--theme-fg-muted)] truncate">
                 {mode === 'free'
                   ? t('timeline.freeHint', { handle: shortNpub(freeIdentity.pubkey) })
                   : entityAddress
@@ -931,14 +962,14 @@ export default function Timeline() {
                     : t('timeline.needUnit')}
               </span>
               <div className="flex items-center gap-3 shrink-0">
-                <span className={`text-[13px] tabular-nums ${remaining < 10 ? 'text-orange-400' : 'text-[color:var(--theme-fg-subtle)]'}`}>
+                <span className={`text-[15px] tabular-nums ${remaining < 10 ? 'text-orange-400' : 'text-[color:var(--theme-fg-subtle)]'}`}>
                   {remaining}
                 </span>
                 <button
                   type="button"
                   onClick={handlePost}
                   disabled={!canPost || !draft.trim() || posting}
-                  className="inline-flex items-center gap-2 rounded-full bg-[color:var(--theme-accent)] text-white font-bold text-[15px] px-5 py-2 hover:brightness-110 disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-full bg-[color:var(--theme-accent)] text-white font-bold text-[17px] px-5 py-2 hover:brightness-110 disabled:opacity-50"
                 >
                   {posting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                   {postStep === 'stamping'
@@ -958,7 +989,7 @@ export default function Timeline() {
 
         {notice ? (
           <div
-            className={`px-4 py-2 text-[14px] border-b border-[color:var(--theme-card-border)] ${
+            className={`px-4 py-2 text-[16px] border-b border-[color:var(--theme-card-border)] ${
               notice.type === 'error' ? 'text-red-400' : 'text-[color:var(--theme-accent)]'
             }`}
           >
@@ -972,7 +1003,7 @@ export default function Timeline() {
         ) : null}
 
         {topic || voteSort ? (
-          <div className="px-4 py-2 border-b border-[color:var(--theme-card-border)] flex items-center gap-2 text-[14px]">
+          <div className="px-4 py-2 border-b border-[color:var(--theme-card-border)] flex items-center gap-2 text-[16px]">
             <span className="text-[color:var(--theme-fg-muted)]">{t('timeline.filtered')}</span>
             {[
               topic ? { key: 'topic', label: topicLabel(topic), clear: () => setTopic(null) } : null,
@@ -1011,9 +1042,8 @@ export default function Timeline() {
               t={t}
               locale={locale}
               myVote={myVoteOn(post)}
-              canAct={post.kind === 'declaration' || canAct}
               status={post.kind === 'declaration' ? declStatuses.get(post.eventId) : undefined}
-              replyStatuses={post.kind === 'declaration' ? replyStatuses : undefined}
+              replyStatuses={replyStatuses}
               voteStatus={myVoteStatus(post)}
               busy={busy[post.index]}
               open={openThreads.has(post.index)}
@@ -1028,7 +1058,7 @@ export default function Timeline() {
           <button
             type="button"
             onClick={() => setVisible((v) => v + PAGE_SIZE)}
-            className="w-full py-4 text-[15px] text-[color:var(--theme-accent)] hover:bg-white/[0.03]"
+            className="w-full py-4 text-[17px] text-[color:var(--theme-accent)] hover:bg-white/[0.03]"
           >
             {t('timeline.showMore')}
           </button>
@@ -1043,12 +1073,12 @@ export default function Timeline() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={t('timeline.search')}
-              className="flex-1 bg-transparent text-[15px] text-white placeholder-[color:var(--theme-fg-muted)] focus:outline-none"
+              className="flex-1 bg-transparent text-[17px] text-white placeholder-[color:var(--theme-fg-muted)] focus:outline-none"
             />
           </label>
 
           <section className="rounded-2xl border border-[color:var(--theme-card-border)] bg-[color:var(--theme-card-bg)] overflow-hidden">
-            <h3 className="px-4 pt-3 pb-2 text-xl font-bold text-white flex items-center gap-2">
+            <h3 className="px-4 pt-3 pb-2 text-2xl font-bold text-white flex items-center gap-2">
               <Flame className="w-5 h-5 text-[color:var(--theme-accent)]" />
               {t('timeline.trendingTitle')}
             </h3>
@@ -1056,8 +1086,8 @@ export default function Timeline() {
           </section>
 
           <section className="rounded-2xl border border-[color:var(--theme-card-border)] bg-[color:var(--theme-card-bg)] px-4 py-3">
-            <h3 className="text-[15px] font-bold text-white">{t('timeline.aboutTitle')}</h3>
-            <p className="text-[13px] text-[color:var(--theme-fg-muted)] mt-1 leading-relaxed">{t('timeline.aboutBody')}</p>
+            <h3 className="text-[17px] font-bold text-white">{t('timeline.aboutTitle')}</h3>
+            <p className="text-[15px] text-[color:var(--theme-fg-muted)] mt-1 leading-relaxed">{t('timeline.aboutBody')}</p>
           </section>
         </div>
       </aside>

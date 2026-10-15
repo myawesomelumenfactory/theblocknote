@@ -5,6 +5,7 @@ import { verifyEvent } from 'nostr-tools/pure'
 import { SimplePool, useWebSocketImplementation } from 'nostr-tools/pool'
 import {
   DECLARATION_TAG,
+  KIND_COMMENT,
   KIND_EVENT_REACTION,
   KIND_EXTERNAL_REACTION,
   MAP_VOTE_TAG,
@@ -28,7 +29,7 @@ const RELAYS = [
 const COLLECTIONS = [
   { label: 'Declarations', file: 'declarations.json', tag: DECLARATION_TAG, validate: validateDeclarationEvent },
   { label: 'Map votes', file: 'map-votes.json', tag: MAP_VOTE_TAG, validate: validateMapVoteEvent },
-  { label: 'Replies', file: 'replies.json', tag: REPLY_TAG, validate: validateReplyEvent },
+  { label: 'Replies', file: 'replies.json', tag: REPLY_TAG, validate: validateReplyEvent, kinds: [1, KIND_COMMENT] },
   {
     label: 'Votes',
     file: 'votes.json',

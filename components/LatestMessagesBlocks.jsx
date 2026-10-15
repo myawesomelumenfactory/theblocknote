@@ -1,21 +1,18 @@
-import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from "framer-motion";
 import GlassCard from "./GlassCard";
 import TranslateButton from "./TranslateButton";
 import { decodeOpReturn } from '../services/TheBlockNote';
 import { Activity, ChevronUp, ChevronDown, Clock, List, Loader2, MessageCircle } from "lucide-react";
-import { applyComment, getHighestFundedUnit } from '../services/BitcoinService';
-import { fetchMessageVotes, shortNpub, voteMessage } from '../services/declarations';
+import { REPLY_MAX, fetchMessageReactions, replyToMessage, shortNpub, voteMessage } from '../services/declarations';
 import { getFreeNoteIdentity } from '../services/freeNotes';
 import { gatewayUrl } from '../services/ipfs';
-import { appendImmutable, loadImmutableRecords } from '../services/ImmutablesStore';
+import { loadImmutableRecords } from '../services/ImmutablesStore';
 import {
-  COMMENT_TEXT_MAX,
   commentBelongsToMessage,
   parseCommentValue,
 } from '../services/immutableProtocol';
 import immutablesData, { immutablesState } from 'virtual:immutables';
-import { SharedContext } from '../src/SharedContext';
 import { windowMotion } from '../services/introMotion';
 import { useLanguage } from '../src/i18n/LanguageContext';
 
@@ -26,7 +23,7 @@ export default function LatestMessagesBlocks() {
   const [messages, setMessages] = useState([]);
   const [opReturns, setOpReturns] = useState([]);
   const [theblocknote, setTheBlockNote] = useState([]);
-  const [freeVotes, setFreeVotes] = useState(() => new Map());
+  const [freeReactions, setFreeReactions] = useState(() => new Map());
   const freeIdentity = useMemo(() => getFreeNoteIdentity(), []);
   const [txids, setTxids] = useState([]);
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
@@ -38,10 +35,8 @@ export default function LatestMessagesBlocks() {
   const [commentDrafts, setCommentDrafts] = useState({});
   const [loading, setLoading] = useState(true);
   const [sortMode, setSortMode] = useState('latest');
-  const { refs, ensureUtxoHex, refreshRefs } = useContext(SharedContext);
   const { t } = useLanguage();
   const sentinelRef = useRef(null);
-  const hasFundedUnit = Boolean(getHighestFundedUnit(Array.isArray(refs) ? refs : [], 450));
   const sortModes = [
     { id: 'latest', label: t('messages.latest'), title: t('messages.latestTitle') },
     { id: 'up', label: t('messages.up'), title: t('messages.upTitle') },
@@ -88,7 +83,7 @@ export default function LatestMessagesBlocks() {
     });
   }
 
-  const hasFreeVote = (messageIndex) => Boolean(freeVotes.get(messageIndex)?.votes.has(freeIdentity.pubkey));
+  const hasFreeVote = (messageIndex) => Boolean(freeReactions.get(messageIndex)?.votes.has(freeIdentity.pubkey));
 
   const handleVote = async (messageIndex, direction) => {
     if (hasFreeVote(messageIndex)) return;
@@ -97,7 +92,7 @@ export default function LatestMessagesBlocks() {
 
     try {
       const vote = await voteMessage(messageIndex, direction);
-      setFreeVotes((prev) => {
+      setFreeReactions((prev) => {
         const next = new Map(prev);
         const entry = next.get(messageIndex) || { ups: new Set(), downs: new Set(), votes: new Map() };
         const field = direction === 'up' ? 'ups' : 'downs';
@@ -131,63 +126,24 @@ export default function LatestMessagesBlocks() {
       return;
     }
 
-    const selectedUnit = getHighestFundedUnit(Array.isArray(refs) ? refs : [], 450);
-    if (!selectedUnit) {
-      setVoteNotice({ type: 'error', text: t('messages.commentBefore') });
-      return;
-    }
-
     setCommentingIndex(messageIndex);
     setVoteNotice(null);
 
     try {
-      const parts = messageIndex.split('_');
-      const hash = parts[0];
-      const vout = parts[1];
-      const utxo = ensureUtxoHex ? await ensureUtxoHex(selectedUnit.index) : selectedUnit;
-      const result = await applyComment(utxo, hash, vout, draft, 450);
-
-      if (!result.success) {
-        setVoteNotice({ type: 'error', text: result.error || t('messages.commentFailed') });
-        return;
-      }
-
-      const cleaned = result.text || draft.replace(/"/g, '').replace(/\s+/g, ' ').trim().slice(0, COMMENT_TEXT_MAX);
-      await appendImmutable({
-        index: `${result.transactionId}_0`,
-        time: Math.floor(Date.now() / 1000),
-        value: result.encoded,
-        kind: 'comment',
-        unconfirmed: true,
+      const reply = await replyToMessage(messageIndex, draft);
+      setFreeReactions((prev) => {
+        const next = new Map(prev);
+        const entry = next.get(messageIndex) || { ups: new Set(), downs: new Set(), votes: new Map(), replies: [] };
+        next.set(messageIndex, { ...entry, replies: [...entry.replies, reply] });
+        return next;
       });
-
-      const newComment = {
-        txid: result.transactionId,
-        time: Math.floor(Date.now() / 1000),
-        text: cleaned,
-        unconfirmed: true,
-      };
-
-      setTheBlockNote((prev) =>
-        prev.map((msg) =>
-          msg.index === messageIndex
-            ? {
-                ...msg,
-                comments: [...(msg.comments || []), newComment],
-              }
-            : msg
-        )
-      );
       setCommentDrafts((prev) => ({ ...prev, [messageIndex]: '' }));
       setOpenCommentLists((prev) => new Set([...prev, messageIndex]));
       setVoteNotice({
         type: 'success',
         text: t('messages.commentRecorded'),
-        url: result.explorerUrl,
+        url: gatewayUrl(reply.cid),
       });
-      if (refreshRefs) {
-        await refreshRefs({ watch: true, address: selectedUnit.public_key });
-      }
     } catch (error) {
       setVoteNotice({ type: 'error', text: error.message || t('messages.commentFailed') });
     } finally {
@@ -501,9 +457,9 @@ export default function LatestMessagesBlocks() {
   useEffect(() => {
     if (!messageKey) return undefined;
     let cancelled = false;
-    fetchMessageVotes(messageKey.split(','))
+    fetchMessageReactions(messageKey.split(','))
       .then((votes) => {
-        if (!cancelled) setFreeVotes(votes);
+        if (!cancelled) setFreeReactions(votes);
       })
       .catch((error) => console.warn('Free votes failed to load', error));
     return () => {
@@ -511,30 +467,38 @@ export default function LatestMessagesBlocks() {
     };
   }, [messageKey]);
 
-  const withFreeVotes = useMemo(
+  const withFreeReactions = useMemo(
     () =>
       theblocknote.map((msg) => {
-        const free = freeVotes.get(msg.index);
-        if (!free || free.votes.size === 0) return msg;
-        const freeList = [...free.votes.values()].map((vote) => ({
+        const free = freeReactions.get(msg.index);
+        if (!free || (free.votes.size === 0 && free.replies.length === 0)) return msg;
+        const freeVotes = [...free.votes.values()].map((vote) => ({
           free: true,
           cid: vote.cid,
           pubkey: vote.pubkey,
           time: vote.time,
           direction: vote.up ? 'up' : 'down',
         }));
+        const freeComments = free.replies.map((reply) => ({
+          free: true,
+          cid: reply.cid,
+          pubkey: reply.pubkey,
+          time: reply.time,
+          text: reply.text,
+        }));
         return {
           ...msg,
           ups: msg.ups + free.ups.size,
           downs: msg.downs + free.downs.size,
-          votes: [...(msg.votes || []), ...freeList].sort((a, b) => b.time - a.time),
+          votes: [...(msg.votes || []), ...freeVotes].sort((a, b) => b.time - a.time),
+          comments: [...(msg.comments || []), ...freeComments].sort((a, b) => a.time - b.time),
         };
       }),
-    [theblocknote, freeVotes]
+    [theblocknote, freeReactions]
   );
 
   const visibleMessages = useMemo(() => {
-    const rows = [...withFreeVotes];
+    const rows = [...withFreeReactions];
     if (sortMode === 'up') {
       rows.sort((a, b) => b.ups - a.ups || b.time - a.time);
       return rows;
@@ -546,7 +510,7 @@ export default function LatestMessagesBlocks() {
     }
     rows.sort((a, b) => b.time - a.time);
     return rows;
-  }, [withFreeVotes, sortMode]);
+  }, [withFreeReactions, sortMode]);
 
   useEffect(() => {
     setVisibleCount(BATCH_SIZE);
@@ -674,11 +638,6 @@ export default function LatestMessagesBlocks() {
         <div className="p-4 mb-4 text-md text-red-800 rounded-lg bg-red-50 dark:bg-red-900/20 dark:text-red-300" role="alert">
           <span className="font-bold">{t('messages.error')}</span> {voteNotice.text}
         </div>
-      )}
-      {!hasFundedUnit && !loading && (
-        <p className="text-white/50 text-sm mb-4">
-          {t('messages.needUnit')}
-        </p>
       )}
 
       {loading ? (
@@ -860,17 +819,17 @@ export default function LatestMessagesBlocks() {
                       ) : (
                         (msg.comments || []).map((comment) => (
                           <li
-                            key={`${comment.txid}-${comment.time}`}
+                            key={`${comment.txid || comment.cid}-${comment.time}`}
                             className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2"
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-start gap-2 flex-wrap">
                                   <a
-                                    href={explorerTxUrl(comment.txid)}
+                                    href={comment.free ? gatewayUrl(comment.cid) : explorerTxUrl(comment.txid)}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    title={t('messages.viewTx')}
+                                    title={comment.free ? t('messages.freeComment', { handle: shortNpub(comment.pubkey) }) : t('messages.viewTx')}
                                     className="text-white text-sm hover:text-white/80 underline decoration-white/25 hover:decoration-white/60"
                                   >
                                     {comment.text}
@@ -903,11 +862,11 @@ export default function LatestMessagesBlocks() {
                         <input
                           type="text"
                           value={commentDrafts[msg.index] || ''}
-                          maxLength={COMMENT_TEXT_MAX}
+                          maxLength={REPLY_MAX}
                           onChange={(event) =>
                             setCommentDrafts((prev) => ({
                               ...prev,
-                              [msg.index]: event.target.value.slice(0, COMMENT_TEXT_MAX),
+                              [msg.index]: event.target.value.slice(0, REPLY_MAX),
                             }))
                           }
                           onKeyDown={(event) => {
@@ -917,20 +876,18 @@ export default function LatestMessagesBlocks() {
                             }
                           }}
                           placeholder={t('messages.commentPlaceholder')}
-                          disabled={!hasFundedUnit || commentingIndex === msg.index}
+                          disabled={commentingIndex === msg.index}
                           className="flex-1 min-w-0 px-3 py-2 rounded-xl border border-[color:var(--theme-inset-border)] bg-[color:var(--theme-inset-bg)] text-white text-sm placeholder-white/40 focus:outline-none focus:border-[color:var(--theme-card-border)] disabled:opacity-50"
                         />
                         <button
                           type="button"
                           onClick={() => handleComment(msg.index)}
                           disabled={
-                            !hasFundedUnit ||
                             commentingIndex === msg.index ||
                             !(commentDrafts[msg.index] || '').trim()
                           }
-                          title={!hasFundedUnit ? t('messages.loadToComment') : t('messages.commentSend')}
+                          title={t('messages.commentSend')}
                           className={`shrink-0 px-4 py-2 rounded-xl border text-sm font-medium transition-colors ${
-                            !hasFundedUnit ||
                             commentingIndex === msg.index ||
                             !(commentDrafts[msg.index] || '').trim()
                               ? 'bg-gray-500/20 text-gray-400 border-white/10 cursor-not-allowed'
@@ -943,14 +900,14 @@ export default function LatestMessagesBlocks() {
                       <div className="flex justify-end">
                         <span
                           className={`text-xs tabular-nums ${
-                            COMMENT_TEXT_MAX - (commentDrafts[msg.index] || '').length < 10
+                            REPLY_MAX - (commentDrafts[msg.index] || '').length < 10
                               ? 'text-red-400'
                               : 'text-white/45'
                           }`}
                         >
                           {t('messages.commentLimit', {
-                            remaining: COMMENT_TEXT_MAX - (commentDrafts[msg.index] || '').length,
-                            max: COMMENT_TEXT_MAX,
+                            remaining: REPLY_MAX - (commentDrafts[msg.index] || '').length,
+                            max: REPLY_MAX,
                           })}
                         </span>
                       </div>

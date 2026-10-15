@@ -100,17 +100,51 @@ export async function validateDeclarationEvent(event) {
   return { digestHex, cid, digest: hexToBytes(digestHex), ots: tagValue(event, 'ots') }
 }
 
-/** An anchored reply is a declaration whose `e` root tag names the declaration it answers. */
+const EVENT_ID = /^[0-9a-f]{64}$/
+const MESSAGE_ID = /^([0-9a-f]{64})_(\d+)$/
+
+/**
+ * An anchored reply is a declaration that answers something: a declaration through its
+ * `e` root tag (kind 1), or an on-chain message through a NIP-22 comment (kind 1111)
+ * on its Bitcoin transaction (`I` / `i` = `bitcoin:tx:<txid>`, plus `vout`).
+ */
 export const REPLY_TAG = 'theblocknote-reply'
+export const REPLY_MAX = DECLARATION_MAX
+export const KIND_COMMENT = 1111
 
 export function replyRoot(event) {
   const eTags = (event?.tags || []).filter((t) => t[0] === 'e')
   return eTags.find((t) => t[3] === 'root')?.[1] || eTags[eTags.length - 1]?.[1] || null
 }
 
-export async function validateReplyEvent(event) {
+/** Tags pointing a kind 1111 comment at an on-chain message. */
+export function messageCommentTags(target) {
+  const [, txid, vout] = String(target).match(MESSAGE_ID) || []
+  if (!txid) throw new Error('Not an on-chain message')
+  const uri = `bitcoin:tx:${txid}`
+  return [
+    ['I', uri],
+    ['K', 'bitcoin:tx'],
+    ['i', uri],
+    ['k', 'bitcoin:tx'],
+    ['vout', vout],
+  ]
+}
+
+/** The declaration event id or on-chain message `txid_vout` a reply answers. */
+export function replyTarget(event) {
+  if (event?.kind === KIND_COMMENT) {
+    const txid = tagValue(event, 'I')?.match(/^bitcoin:tx:([0-9a-f]{64})$/)?.[1]
+    const vout = tagValue(event, 'vout')
+    return txid && /^\d+$/.test(vout || '') ? `${txid}_${vout}` : null
+  }
   const root = replyRoot(event)
-  if (!root || !/^[0-9a-f]{64}$/.test(root) || !event?.content) return null
+  return root && EVENT_ID.test(root) ? root : null
+}
+
+export async function validateReplyEvent(event) {
+  const root = replyTarget(event)
+  if (!root || !event?.content || event.content.length > REPLY_MAX) return null
   const valid = await validateDeclarationEvent(event)
   return valid ? { ...valid, root } : null
 }
@@ -124,9 +158,6 @@ export async function validateReplyEvent(event) {
 export const VOTE_TAG = 'theblocknote-vote'
 export const KIND_EVENT_REACTION = 7
 export const KIND_EXTERNAL_REACTION = 17
-
-const EVENT_ID = /^[0-9a-f]{64}$/
-const MESSAGE_ID = /^([0-9a-f]{64})_(\d+)$/
 
 export function isMessageTarget(target) {
   return MESSAGE_ID.test(String(target || ''))

@@ -15,6 +15,18 @@ export const OTS_CALENDARS = [
   'https://a.pool.eternitywall.com',
 ]
 
+/**
+ * The pool servers above aggregate stamps and hand them to these calendars, so pending
+ * attestations name these URIs; upgrades must be allowed to ask them.
+ */
+export const OTS_UPGRADE_CALENDARS = [
+  ...OTS_CALENDARS,
+  'https://alice.btc.calendar.opentimestamps.org',
+  'https://bob.btc.calendar.opentimestamps.org',
+  'https://finney.calendar.eternitywall.com',
+  'https://btc.calendar.catallaxy.com',
+]
+
 const ACCEPT = { Accept: 'application/vnd.opentimestamps.v1' }
 
 const HEADER_MAGIC = Uint8Array.from([
@@ -296,7 +308,7 @@ export async function stampDigest(digest, calendars = OTS_CALENDARS) {
  * Only calendars in the allowlist are contacted.
  * @returns {Promise<{ proof: Uint8Array, changed: boolean }>}
  */
-export async function upgradeProof(proof, calendars = OTS_CALENDARS) {
+export async function upgradeProof(proof, calendars = OTS_UPGRADE_CALENDARS) {
   const { digest, node } = parseDetached(proof)
   const allowed = new Set(calendars.map((url) => url.replace(/\/+$/, '')))
   const entries = await walkAttestations(node, digest)
