@@ -4,6 +4,7 @@ import { npubEncode } from 'nostr-tools/nip19'
 import {
   base64ToBytes,
   bytesToBase64,
+  OTS_UPGRADE_CALENDARS,
   describeProof,
   stampDigest,
   upgradeProof,
@@ -205,11 +206,29 @@ export async function fetchDeclarations(limit = 100) {
 }
 
 /**
+ * Listen on the relays for new The Block Note declarations, replies and votes.
+ * @param {(event: object) => void} onEvent
+ * @returns {() => void} stops listening
+ */
+export function subscribeLiveNotes(onEvent) {
+  const sub = getPool().subscribeMany(
+    FREE_NOTE_RELAYS,
+    {
+      kinds: [KIND_NOTE, KIND_EVENT_REACTION, KIND_EXTERNAL_REACTION, KIND_COMMENT],
+      '#t': [DECLARATION_TAG, REPLY_TAG, VOTE_TAG],
+      since: Math.floor(Date.now() / 1000),
+    },
+    { onevent: onEvent },
+  )
+  return () => sub.close()
+}
+
+/**
  * Bitcoin status of each declaration: anchored (with block and calendar tx) or pending.
- * Pending proofs are upgraded from the calendars at most every ten minutes.
+ * Pending proofs are upgraded from the calendars at most once per `minIntervalMs`.
  * @returns {Promise<Map<string, object>>} keyed by eventId
  */
-export async function resolveDeclarationStatuses(declarations) {
+export async function resolveDeclarationStatuses(declarations, { minIntervalMs = UPGRADE_EVERY_MS } = {}) {
   const verified = readJson(VERIFIED_STORAGE)
   const checked = readJson(CHECKED_STORAGE)
   const localProofs = readJson(PROOFS_STORAGE)
@@ -228,12 +247,12 @@ export async function resolveDeclarationStatuses(declarations) {
         return
       }
 
-      const due = Date.now() - (checked[decl.digestHex] || 0) > UPGRADE_EVERY_MS
+      const due = Date.now() - (checked[decl.digestHex] || 0) > minIntervalMs
       for (const b64 of candidates) {
         try {
           let proof = base64ToBytes(b64)
           if (due) {
-            const upgraded = await upgradeProof(proof)
+            const upgraded = await upgradeProof(proof, OTS_UPGRADE_CALENDARS)
             if (upgraded.changed) proof = upgraded.proof
           }
           const result = await verifyProof(proof, decl.digestHex)

@@ -45,6 +45,7 @@ import {
   resolveDeclarationStatuses,
   shortNpub,
   replyToMessage,
+  subscribeLiveNotes,
   voteDeclaration,
   voteMessage,
 } from '../services/declarations'
@@ -55,6 +56,8 @@ import TranslateButton from './TranslateButton'
 
 const FEE = 450
 const PAGE_SIZE = 20
+const RECHECK_EVERY_MS = 2 * 60 * 1000
+const LIVE_REFRESH_DELAY_MS = 1500
 const CATEGORY_ICONS = {
   bitcoin: Bitcoin,
   voices: Megaphone,
@@ -401,18 +404,34 @@ export default function Timeline() {
 
   const chainPosts = useMemo(() => buildTimeline(records), [records])
   const chainKey = chainPosts.map((p) => p.index).join(',')
-  useEffect(() => {
+  const latestChainKey = useRef(chainKey)
+  latestChainKey.current = chainKey
+  const refreshMessageReactions = useCallback(async () => {
     if (!chainKey) return
-    let cancelled = false
-    fetchMessageReactions(chainKey.split(','))
-      .then((reactions) => {
-        if (!cancelled) setMessageReactions(reactions)
-      })
-      .catch((err) => console.warn('Message reactions failed to load', err))
-    return () => {
-      cancelled = true
-    }
+    const reactions = await fetchMessageReactions(chainKey.split(','))
+    if (latestChainKey.current === chainKey) setMessageReactions(reactions)
   }, [chainKey])
+
+  useEffect(() => {
+    refreshMessageReactions().catch((err) => console.warn('Message reactions failed to load', err))
+  }, [refreshMessageReactions])
+
+  const refreshers = useRef({})
+  refreshers.current = { refreshDeclarations, refreshMessageReactions }
+  useEffect(() => {
+    let timer = null
+    const stop = subscribeLiveNotes(() => {
+      clearTimeout(timer)
+      timer = setTimeout(() => {
+        const { refreshDeclarations: decls, refreshMessageReactions: messages } = refreshers.current
+        Promise.all([decls(), messages()]).catch((err) => console.warn('Live refresh failed', err))
+      }, LIVE_REFRESH_DELAY_MS)
+    })
+    return () => {
+      clearTimeout(timer)
+      stop()
+    }
+  }, [])
 
   const posts = useMemo(() => {
     const toComment = (r) => ({
@@ -673,6 +692,38 @@ export default function Timeline() {
       }),
     )
   }, [declReactions, messageReactions, freeIdentity])
+
+  const pendingState = useRef({})
+  pendingState.current = { declarations, declStatuses, declReactions, messageReactions, replyStatuses, voteStatuses }
+  useEffect(() => {
+    const recheck = async () => {
+      if (document.hidden) return
+      const { declarations: decls, declStatuses: dStat, declReactions: dReact, messageReactions: mReact, replyStatuses: rStat, voteStatuses: vStat } =
+        pendingState.current
+      const isPending = (statuses, id) => statuses.get(id)?.status === 'pending'
+      const pendingDecls = decls.filter((d) => isPending(dStat, d.eventId))
+      const pendingReplies = []
+      const pendingVotes = []
+      for (const entry of [...dReact.values(), ...mReact.values()]) {
+        for (const reply of entry.replies) if (reply.anchored && isPending(rStat, reply.eventId)) pendingReplies.push(reply)
+        for (const vote of entry.votes.values()) if (vote.anchored && isPending(vStat, vote.eventId)) pendingVotes.push(vote)
+      }
+      const options = { minIntervalMs: RECHECK_EVERY_MS - 5000 }
+      const merge = (setter) => (statuses) =>
+        setter((prev) => {
+          const next = new Map(prev)
+          for (const [id, status] of statuses) next.set(id, status)
+          return next
+        })
+      await Promise.all([
+        pendingDecls.length && resolveDeclarationStatuses(pendingDecls, options).then(merge(setDeclStatuses)),
+        pendingReplies.length && resolveDeclarationStatuses(pendingReplies, options).then(merge(setReplyStatuses)),
+        pendingVotes.length && resolveDeclarationStatuses(pendingVotes, options).then(merge(setVoteStatuses)),
+      ])
+    }
+    const id = setInterval(() => recheck().catch((err) => console.warn('Pending re-check failed', err)), RECHECK_EVERY_MS)
+    return () => clearInterval(id)
+  }, [])
 
   const myVoteStatus = (post) => {
     const mine = freeVotesOn(post)?.votes?.get(freeIdentity.pubkey)
