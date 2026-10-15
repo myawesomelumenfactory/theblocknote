@@ -269,10 +269,12 @@ function PostItem({ post, t, locale, myVote, busy, open, onToggle, onVote, onRep
                 target="_blank"
                 rel="noopener noreferrer"
                 title={new Date(post.time * 1000).toLocaleString(locale)}
-                className="inline-flex items-center gap-1 rounded-full px-2 py-1 hover:text-[color:var(--theme-accent)]"
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-1 hover:underline ${
+                  post.unconfirmed ? '' : 'text-emerald-600'
+                }`}
               >
-                <ExternalLink className="w-[16px] h-[16px]" />
-                {t('timeline.onChain')}
+                {post.unconfirmed ? <Clock className="w-[16px] h-[16px]" /> : <ShieldCheck className="w-[16px] h-[16px]" />}
+                {t(post.unconfirmed ? 'timeline.pending' : 'timeline.inBitcoin')}
               </a>
             )}
           </div>
