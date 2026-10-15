@@ -1,5 +1,6 @@
 import {
   OTS_CALENDARS,
+  OTS_UPGRADE_CALENDARS,
   base64ToBytes,
   bytesToBase64,
   bytesToHex,
@@ -95,7 +96,7 @@ export async function refreshStamps() {
     if (stamp.status === 'anchored') continue
     try {
       let proof = base64ToBytes(stamp.proof)
-      const upgraded = await upgradeProof(proof, OTS_CALENDARS)
+      const upgraded = await upgradeProof(proof, OTS_UPGRADE_CALENDARS)
       if (upgraded.changed) {
         proof = upgraded.proof
         stamp.proof = bytesToBase64(proof)
@@ -126,7 +127,7 @@ export async function verifyStampFiles(messageBytes, proofBytes) {
   if (described.digest !== digest) return { status: 'mismatch', digest }
 
   if (described.bitcoinAnchors.length === 0) {
-    const upgraded = await upgradeProof(proof, OTS_CALENDARS)
+    const upgraded = await upgradeProof(proof, OTS_UPGRADE_CALENDARS)
     if (upgraded.changed) proof = upgraded.proof
   }
   const verification = await verifyProof(proof, digest)
