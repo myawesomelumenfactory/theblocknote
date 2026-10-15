@@ -108,6 +108,13 @@ export default function Header() {
                   <span className="font-medium">{t('nav.status')}</span>
                 </NavLink>
                 <NavLink
+                  to="/anchors"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={navClass}
+                >
+                  <span className="font-medium">{t('nav.anchors')}</span>
+                </NavLink>
+                <NavLink
                   to="/direct"
                   onClick={() => setMobileMenuOpen(false)}
                   className={navClass}

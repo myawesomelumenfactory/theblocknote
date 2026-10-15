@@ -6,6 +6,7 @@ import MainPage from '../pages/MainPage';
 import ReadPage from '../pages/ReadPage';
 import GeneratePage from '../pages/GeneratePage';
 import StatusPage from '../pages/StatusPage';
+import AnchorsPage from '../pages/AnchorsPage';
 import DirectMessagePage from '../pages/DirectMessagePage';
 import DirectStreamPage from '../pages/DirectStreamPage';
 import MessagesPage from '../pages/MessagesPage';
@@ -329,6 +330,7 @@ function App() {
                     <Route path="/read" element={<ReadPage />} />
                     <Route path="/generate" element={<GeneratePage />} />
                     <Route path="/status" element={<StatusPage />} />
+                    <Route path="/anchors" element={<AnchorsPage />} />
                     <Route path="/direct" element={<DirectMessagePage />} />
                     <Route path="/messages/:address" element={<MessagesPage />} />
                     <Route path="/stream" element={<DirectStreamPage />} />

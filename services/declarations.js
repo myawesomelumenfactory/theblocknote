@@ -208,14 +208,15 @@ export async function fetchDeclarations(limit = 100) {
 /**
  * Listen on the relays for new The Block Note declarations, replies and votes.
  * @param {(event: object) => void} onEvent
+ * @param {string[]} [topics]
  * @returns {() => void} stops listening
  */
-export function subscribeLiveNotes(onEvent) {
+export function subscribeLiveNotes(onEvent, topics = [DECLARATION_TAG, REPLY_TAG, VOTE_TAG]) {
   const sub = getPool().subscribeMany(
     FREE_NOTE_RELAYS,
     {
       kinds: [KIND_NOTE, KIND_EVENT_REACTION, KIND_EXTERNAL_REACTION, KIND_COMMENT],
-      '#t': [DECLARATION_TAG, REPLY_TAG, VOTE_TAG],
+      '#t': topics,
       since: Math.floor(Date.now() / 1000),
     },
     { onevent: onEvent },
