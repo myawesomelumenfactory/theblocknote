@@ -6,7 +6,8 @@
  * Results are cached per target language in localStorage.
  */
 
-const LANGUAGE_NAMES = { en: 'English', fr: 'French' }
+import { englishNameOf, translateCode } from '../src/i18n/languages'
+
 const CACHE_KEY = 'theblocknote:translations'
 const CACHE_LIMIT = 500
 const TIMEOUT_MS = 20000
@@ -53,7 +54,7 @@ function cleanOutput(output) {
 }
 
 async function viaPollinations(text, target) {
-  const language = LANGUAGE_NAMES[target] || target
+  const language = englishNameOf(target)
   const params = new URLSearchParams({
     system: SYSTEM_PROMPT.replaceAll('{language}', language),
     model: 'openai',
@@ -68,7 +69,10 @@ async function viaPollinations(text, target) {
 }
 
 async function viaMyMemory(text, target) {
-  const params = new URLSearchParams({ q: text.slice(0, 500), langpair: `autodetect|${target}` })
+  const params = new URLSearchParams({
+    q: text.slice(0, 500),
+    langpair: `autodetect|${translateCode(target)}`,
+  })
   const res = await fetchWithTimeout(`https://api.mymemory.translated.net/get?${params}`)
   const data = await res.json()
   if (/DISTINCT LANGUAGES/i.test(data?.responseDetails || '')) return { text, provider: 'MyMemory' }
@@ -79,21 +83,22 @@ async function viaMyMemory(text, target) {
 
 /**
  * @param {string} text
- * @param {'en'|'fr'} target
+ * @param {string} target language code from the switcher (e.g. `es`, `ja`, `zh-TW`)
  * @returns {Promise<{ text: string, provider: string, same: boolean }>}
  */
 export async function translateText(text, target) {
   const source = String(text || '').trim()
   if (!source) throw new Error('Nothing to translate')
-  const key = `${target}:${source}`
+  const code = translateCode(target)
+  const key = `${code}:${source}`
   const cached = readCache()[key]
   if (cached) return cached
 
   let result
   try {
-    result = await viaPollinations(source, target)
+    result = await viaPollinations(source, code)
   } catch {
-    result = await viaMyMemory(source, target)
+    result = await viaMyMemory(source, code)
   }
   const normalize = (s) => s.toLowerCase().replace(/[\s.,!?'"’]+/g, '')
   const entry = { text: result.text, provider: result.provider, same: normalize(result.text) === normalize(source) }

@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { LOCALES, translations } from './translations'
+import { LOCALES, localeOf, matchBrowserLanguage } from './languages'
+import { translations } from './translations'
 
 const STORAGE_KEY = 'theblocknote.lang'
 const LanguageContext = createContext(null)
@@ -12,7 +13,7 @@ function detectLocale() {
     // Ignore storage errors.
   }
   const browser = typeof navigator !== 'undefined' ? navigator.language || '' : ''
-  return browser.toLowerCase().startsWith('fr') ? 'fr' : 'en'
+  return matchBrowserLanguage(browser)
 }
 
 function lookup(dict, key) {
@@ -24,6 +25,11 @@ function interpolate(template, vars) {
   return template.replace(/\{(\w+)\}/g, (_, name) =>
     vars[name] == null ? '' : String(vars[name])
   )
+}
+
+/** Prefer the selected language catalog; fall back to English for missing keys/files. */
+function uiDict(lang) {
+  return translations[lang] || translations.en
 }
 
 export function LanguageProvider({ children }) {
@@ -41,12 +47,13 @@ export function LanguageProvider({ children }) {
 
   useEffect(() => {
     document.documentElement.lang = lang
-    document.title = lookup(translations[lang], 'app.title') || 'The Block Note'
+    document.documentElement.dir = ['ar', 'he', 'fa', 'ur'].includes(lang) ? 'rtl' : 'ltr'
+    document.title = lookup(uiDict(lang), 'app.title') || 'The Block Note'
   }, [lang])
 
   const t = useCallback(
     (key, vars = {}) => {
-      const raw = lookup(translations[lang], key) ?? lookup(translations.en, key) ?? key
+      const raw = lookup(uiDict(lang), key) ?? lookup(translations.en, key) ?? key
       return interpolate(raw, vars)
     },
     [lang]
@@ -57,7 +64,7 @@ export function LanguageProvider({ children }) {
       lang,
       setLang,
       t,
-      locale: lang === 'fr' ? 'fr-FR' : 'en-US',
+      locale: localeOf(lang),
     }),
     [lang, setLang, t]
   )

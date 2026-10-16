@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "index:immutables": "node scripts/fetch-immutables.js",
     "immutables:service": "node scripts/immutables-service.js",
-    "declarations:pin": "node scripts/declarations-pinner.js"
+    "declarations:pin": "node scripts/declarations-pinner.js",
+    "i18n:generate": "node scripts/generate-ui-locales.mjs",
+    "i18n:fix-placeholders": "node scripts/fix-locale-placeholders.mjs"
   },
   "dependencies": {
     "@esbuild-plugins/node-globals-polyfill": "^0.2.3",
